@@ -1,31 +1,21 @@
 // Booking functions
 
-// Admin code - defined ONCE
 const ADMIN_CODE = 'admin123';
 
 // Check if selection is allowed (before Sunday 11:59 PM)
 function canEdit() {
     const now = new Date();
-    const day = now.getDay(); // 0 = Sunday
+    const day = now.getDay();
     const hour = now.getHours();
     const minutes = now.getMinutes();
     
-    // If it's Sunday after 11:59 PM (i.e., Monday or later, or Sunday after 23:59)
-    if (day === 0 && (hour >= 23 && minutes >= 59)) {
-        return false;
-    }
-    if (day === 0 && hour >= 23) {
-        return false;
-    }
-    // After Sunday (Monday-Saturday)
-    if (day !== 0) {
-        // Check if it's past Sunday 11:59 PM (meaning it's Monday or later)
-        return true;
-    }
-    return true;
+    // Sunday after 11:59 PM or Monday-Saturday
+    if (day === 0 && (hour >= 23 && minutes >= 59)) return false;
+    if (day === 0 && hour >= 23) return false;
+    if (day === 0) return true; // Sunday before 11:59 PM
+    return true; // Monday-Saturday
 }
 
-// Check if it's past the deadline
 function isPastDeadline() {
     const now = new Date();
     const day = now.getDay();
@@ -34,7 +24,7 @@ function isPastDeadline() {
     
     if (day === 0 && hour >= 23 && minutes >= 59) return true;
     if (day === 0 && hour >= 23) return true;
-    if (day !== 0) return false;
+    if (day === 0) return false;
     return false;
 }
 
@@ -65,7 +55,6 @@ async function toggleAvailability(day) {
         return;
     }
     
-    // Check if editing is allowed
     if (!canEdit()) {
         alert('❌ Selection deadline has passed (Sunday 11:59 PM). You can only view your selections.');
         return;
@@ -168,12 +157,11 @@ async function getMyAvailability() {
         if (!response.ok) throw new Error('Failed to fetch your availability');
         return await response.json();
     } catch (error) {
-        console.error('Error fetching availability:', error);
+        console.error('Error fetching my availability:', error);
         return [];
     }
 }
 
-// Get all users with their availability (admin only)
 async function getAllUsersAvailability() {
     const token = getToken();
     if (!token) return [];
@@ -193,7 +181,6 @@ async function getAllUsersAvailability() {
     }
 }
 
-// Get selected players for each day
 async function getSelectedPlayers() {
     const token = getToken();
     if (!token) return [];
@@ -213,7 +200,6 @@ async function getSelectedPlayers() {
     }
 }
 
-// Render UI
 function renderDayCard(day, currentUser, isAdmin, canEditBool) {
     const card = document.createElement('div');
     card.className = 'day-card';
@@ -222,13 +208,8 @@ function renderDayCard(day, currentUser, isAdmin, canEditBool) {
     const isBooked = day.is_booked && day.selected_user;
     const isSelectedUser = isBooked && day.selected_user?.id === currentUser?.id;
     
-    if (isUserAvailable) {
-        card.classList.add('selected');
-    }
-    
-    if (isBooked) {
-        card.classList.add('booked');
-    }
+    if (isUserAvailable) card.classList.add('selected');
+    if (isBooked) card.classList.add('booked');
     
     const userCount = day.total_users || 0;
     
@@ -240,9 +221,6 @@ function renderDayCard(day, currentUser, isAdmin, canEditBool) {
             </div>
         `;
     }
-    
-    // Only show clickable if editing is allowed
-    const clickableClass = canEditBool ? '' : 'no-click';
     
     let adminActionsHtml = '';
     if (isAdmin) {
@@ -272,12 +250,9 @@ function renderDayCard(day, currentUser, isAdmin, canEditBool) {
         </div>
     `;
     
-    // Only add click handler if editing is allowed
     if (canEditBool) {
         card.addEventListener('click', (e) => {
-            if (e.target.closest('.admin-actions')) {
-                return;
-            }
+            if (e.target.closest('.admin-actions')) return;
             handleToggleAvailability(day.day);
         });
     }
@@ -297,35 +272,22 @@ async function renderDashboard() {
         const canEditBool = canEdit();
         const pastDeadline = isPastDeadline();
         
-        // Show deadline warning
         const warningBanner = document.getElementById('deadlineWarning');
         if (warningBanner) {
-            if (pastDeadline) {
-                warningBanner.style.display = 'block';
-            } else {
-                warningBanner.style.display = 'none';
-            }
+            warningBanner.style.display = pastDeadline ? 'block' : 'none';
         }
         
-        // Show admin button
         const adminBtn = document.getElementById('adminBtn');
         if (adminBtn) {
-            if (isAdmin) {
-                adminBtn.style.display = 'inline-block';
-            } else {
-                adminBtn.style.display = 'none';
-            }
+            adminBtn.style.display = isAdmin ? 'inline-block' : 'none';
         }
         
-        if (isAdmin) {
-            const adminControls = document.getElementById('adminControls');
-            if (adminControls) {
-                adminControls.style.display = 'block';
-            }
+        const adminControls = document.getElementById('adminControls');
+        if (adminControls) {
+            adminControls.style.display = isAdmin ? 'block' : 'none';
         }
         
         const bookings = await getAvailability();
-        
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const sortedBookings = bookings.sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
         
@@ -396,39 +358,32 @@ async function updateMyAvailability() {
     }
 }
 
-// Event handlers
 async function handleToggleAvailability(day) {
     const result = await toggleAvailability(day);
-    if (result) {
-        await renderDashboard();
-    }
+    if (result) await renderDashboard();
 }
 
 async function handleRandomSelect(day) {
     const result = await selectRandomUser(day);
-    if (result) {
-        await renderDashboard();
-    }
+    if (result) await renderDashboard();
 }
 
 async function handleReset(day) {
-    if (!confirm(`Are you sure you want to reset ${day}?`)) {
-        return;
-    }
-    
+    if (!confirm(`Are you sure you want to reset ${day}?`)) return;
     const result = await resetDay(day);
-    if (result) {
-        await renderDashboard();
-    }
+    if (result) await renderDashboard();
 }
 
-// Admin Panel Functions
 async function openAdminPanel() {
     const modal = document.getElementById('adminModal');
+    if (!modal) return;
     modal.style.display = 'block';
-    document.getElementById('adminContent').style.display = 'none';
-    document.getElementById('adminError').style.display = 'none';
-    document.getElementById('adminCode').value = '';
+    const adminContent = document.getElementById('adminContent');
+    const adminError = document.getElementById('adminError');
+    const adminCode = document.getElementById('adminCode');
+    if (adminContent) adminContent.style.display = 'none';
+    if (adminError) adminError.style.display = 'none';
+    if (adminCode) adminCode.value = '';
 }
 
 async function verifyAdmin() {
@@ -444,6 +399,7 @@ async function verifyAdmin() {
 
 async function loadAllUsersAvailability() {
     const container = document.getElementById('allUsersAvailability');
+    if (!container) return;
     container.innerHTML = 'Loading...';
     
     try {
@@ -472,7 +428,6 @@ async function loadAllUsersAvailability() {
     }
 }
 
-// Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('dashboard.html')) {
         const user = getCurrentUser();
@@ -484,13 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDashboard();
         setInterval(renderDashboard, 30000);
         
-        // Admin button
         const adminBtn = document.getElementById('adminBtn');
-        if (adminBtn) {
-            adminBtn.addEventListener('click', openAdminPanel);
-        }
+        if (adminBtn) adminBtn.addEventListener('click', openAdminPanel);
         
-        // Modal close
         const closeBtn = document.getElementById('closeModal');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
@@ -498,27 +449,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // Click outside modal to close
         window.addEventListener('click', (e) => {
             const modal = document.getElementById('adminModal');
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
+            if (e.target === modal) modal.style.display = 'none';
         });
         
-        // Verify admin button
         const verifyBtn = document.getElementById('verifyAdminBtn');
-        if (verifyBtn) {
-            verifyBtn.addEventListener('click', verifyAdmin);
-        }
+        if (verifyBtn) verifyBtn.addEventListener('click', verifyAdmin);
         
-        // Enter key for admin code
         const adminCodeInput = document.getElementById('adminCode');
         if (adminCodeInput) {
             adminCodeInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    verifyAdmin();
-                }
+                if (e.key === 'Enter') verifyAdmin();
             });
         }
     }
