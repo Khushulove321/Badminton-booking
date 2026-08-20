@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Badminton Booking</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="nav-brand">🏸 Badminton Booking</div>
+            <div class="nav-user">
+                <span id="userName">Welcome, User</span>
+                <button id="logoutBtn" class="btn btn-secondary btn-sm">Logout</button>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <h2>📅 Weekly Availability</h2>
+<p>Select the days you're available to play (7:00 AM - 8:00 AM)</p>                <div id="adminControls" style="display: none;">
+                    <p class="admin-badge">👑 Admin Controls</p>
+                </div>
+            </div>
+
+            <div class="days-grid" id="daysGrid">
+                <!-- Days will be rendered here -->
+            </div>
+
+            <div class="info-section">
+                <div class="info-card">
+                    <h3>📊 How it Works</h3>
+                    <ul>
+                        <li>Click on a day to mark your availability</li>
+                        <li>Click again to unmark</li>
+                        <li>Admin randomly selects a player for each day</li>
+                        <li>Selected player will be highlighted</li>
+                    </ul>
+                </div>
+                <div class="info-card" id="myAvailability">
+                    <h3>📋 My Availability</h3>
+                    <div id="myDaysList">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/js/supabase-config.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/booking.js"></script>
+</body>
+</html>
