@@ -5,6 +5,27 @@ window.getCurrentUser = getCurrentUser;
 window.getToken = getToken;
 window.checkAdmin = checkAdmin;
 window.logoutUser = logoutUser;
+window.showToast = showToast;
+window.showError = showError;
+window.showSuccess = showSuccess;
+
+// Toast notification function
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function showError(message) {
+    showToast(message, 'error');
+    console.error('Error:', message);
+}
+
+function showSuccess(message) {
+    showToast(message, 'success');
+}
 
 // Login function
 async function loginUser(username, password) {

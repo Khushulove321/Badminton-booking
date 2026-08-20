@@ -40,10 +40,12 @@ async function getAvailability() {
         });
         
         if (!response.ok) throw new Error('Failed to fetch availability');
-        return await response.json();
+        const data = await response.json();
+        console.log('📊 Availability data:', data);
+        return data;
     } catch (error) {
         console.error('Error fetching availability:', error);
-        showToast('Failed to load availability', 'error');
+        window.showToast('Failed to load availability', 'error');
         return [];
     }
 }
@@ -72,11 +74,11 @@ async function toggleAvailability(day) {
         if (!response.ok) throw new Error('Failed to update availability');
         
         const data = await response.json();
-        showToast(data.message, 'success');
+        window.showToast(data.message, 'success');
         return data;
     } catch (error) {
         console.error('Error updating availability:', error);
-        showToast('Failed to update availability', 'error');
+        window.showToast('Failed to update availability', 'error');
         return null;
     }
 }
@@ -103,11 +105,11 @@ async function selectRandomUser(day) {
         }
 
         const data = await response.json();
-        showToast(`🎯 Random user selected for ${day}!`, 'success');
+        window.showToast(`🎯 Random user selected for ${day}!`, 'success');
         return data;
     } catch (error) {
         console.error('Error selecting user:', error);
-        showToast(error.message || 'Failed to select user', 'error');
+        window.showToast(error.message || 'Failed to select user', 'error');
         return null;
     }
 }
@@ -134,11 +136,11 @@ async function resetDay(day) {
         }
 
         const data = await response.json();
-        showToast(`🔄 Reset ${day} successfully`, 'success');
+        window.showToast(`🔄 Reset ${day} successfully`, 'success');
         return data;
     } catch (error) {
         console.error('Error resetting day:', error);
-        showToast(error.message || 'Failed to reset day', 'error');
+        window.showToast(error.message || 'Failed to reset day', 'error');
         return null;
     }
 }
@@ -288,6 +290,13 @@ async function renderDashboard() {
         }
         
         const bookings = await getAvailability();
+        console.log('📊 Bookings to render:', bookings);
+        
+        if (!bookings || bookings.length === 0) {
+            daysGrid.innerHTML = '<p style="color: #888;">No bookings available. Please contact admin.</p>';
+            return;
+        }
+        
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const sortedBookings = bookings.sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
         
