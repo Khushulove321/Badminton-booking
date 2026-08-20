@@ -23,12 +23,7 @@ async function loginUser(username, password) {
         
         if (error) {
             console.error('❌ Login error:', error);
-            // Check if user exists but profile not created
-            if (error.message === 'Invalid login credentials') {
-                alert('❌ Invalid username or password. Please make sure you registered with this username.');
-            } else {
-                alert('❌ Login failed: ' + error.message);
-            }
+            alert('❌ Login failed: ' + error.message);
             return;
         }
         
@@ -52,6 +47,11 @@ async function registerUser(username, fullname, password, confirmPassword) {
         return;
     }
     
+    if (password.length < 6) {
+        alert('❌ Password must be at least 6 characters');
+        return;
+    }
+    
     if (!window.supabase) {
         console.error('❌ window.supabase is undefined!');
         alert('❌ Supabase not loaded. Please refresh the page.');
@@ -61,6 +61,8 @@ async function registerUser(username, fullname, password, confirmPassword) {
     try {
         const email = username + '@gmail.com';
         console.log('📧 Using email:', email);
+        console.log('📝 Full name:', fullname);
+        console.log('📝 Password length:', password.length);
         
         const { data, error } = await window.supabase.auth.signUp({
             email: email,
@@ -79,15 +81,15 @@ async function registerUser(username, fullname, password, confirmPassword) {
             return;
         }
         
-        console.log('✅ Registration successful!', data);
+        console.log('✅ Registration API response:', data);
         
-        // If user already exists, try to login instead
-        if (data.user && data.session) {
-            alert('✅ Account created! Please login.');
+        if (data.user) {
+            console.log('✅ User created:', data.user.email);
+            alert('✅ Registration successful! Please login.');
             window.location.href = '/login.html';
         } else {
-            alert('✅ Registration successful! Please check your email to confirm, then login.');
-            window.location.href = '/login.html';
+            console.error('❌ No user data returned');
+            alert('❌ Registration failed. Please try again.');
         }
     } catch (error) {
         console.error('❌ Registration error:', error);
@@ -107,9 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const usernameField = document.getElementById('username');
         const passwordField = document.getElementById('password');
-        
-        console.log('🔍 Username field:', usernameField ? '✅ Found' : '❌ Not found');
-        console.log('🔍 Password field:', passwordField ? '✅ Found' : '❌ Not found');
         
         if (!usernameField || !passwordField) {
             alert('❌ Form fields missing. Please refresh the page.');
@@ -146,6 +145,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const fullname = document.getElementById('fullname').value.trim();
             const password = document.getElementById('password').value.trim();
             const confirmPassword = document.getElementById('confirmPassword').value.trim();
+            
+            console.log('📝 Username:', username);
+            console.log('📝 Full name:', fullname);
+            console.log('📝 Password length:', password.length);
             
             if (!username || !fullname || !password || !confirmPassword) {
                 alert('❌ Please fill in all fields');
