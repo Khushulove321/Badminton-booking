@@ -38,7 +38,7 @@ async function loginUser(username, password) {
     }
 }
 
-// Register function
+// Register function - AUTO CREATE USER
 async function registerUser(username, fullname, password, confirmPassword) {
     console.log('📝 Register attempt for:', username);
     
@@ -59,11 +59,13 @@ async function registerUser(username, fullname, password, confirmPassword) {
     }
     
     try {
+        // Use email as username@gmail.com
         const email = username + '@gmail.com';
         console.log('📧 Using email:', email);
         console.log('📝 Full name:', fullname);
         console.log('📝 Password length:', password.length);
         
+        // Try to sign up
         const { data, error } = await window.supabase.auth.signUp({
             email: email,
             password: password,
@@ -77,6 +79,13 @@ async function registerUser(username, fullname, password, confirmPassword) {
         
         if (error) {
             console.error('❌ Registration error:', error);
+            
+            // If user already exists, try to login
+            if (error.message.includes('already registered')) {
+                alert('⚠️ Username already exists. Please try logging in.');
+                return;
+            }
+            
             alert('❌ Registration failed: ' + error.message);
             return;
         }
@@ -85,6 +94,30 @@ async function registerUser(username, fullname, password, confirmPassword) {
         
         if (data.user) {
             console.log('✅ User created:', data.user.email);
+            
+            // Create profile in profiles table
+            try {
+                const { error: profileError } = await window.supabase
+                    .from('profiles')
+                    .insert([
+                        { 
+                            id: data.user.id,
+                            username: username,
+                            full_name: fullname,
+                            is_admin: false
+                        }
+                    ]);
+                    
+                if (profileError) {
+                    console.error('❌ Profile creation error:', profileError);
+                    alert('⚠️ Account created but profile not set up. Please contact admin.');
+                } else {
+                    console.log('✅ Profile created successfully!');
+                }
+            } catch (profileError) {
+                console.error('❌ Profile creation error:', profileError);
+            }
+            
             alert('✅ Registration successful! Please login.');
             window.location.href = '/login.html';
         } else {
