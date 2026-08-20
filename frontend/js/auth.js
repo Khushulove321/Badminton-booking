@@ -23,7 +23,12 @@ async function loginUser(username, password) {
         
         if (error) {
             console.error('❌ Login error:', error);
-            alert('❌ Login failed: ' + error.message);
+            // Check if user exists but profile not created
+            if (error.message === 'Invalid login credentials') {
+                alert('❌ Invalid username or password. Please make sure you registered with this username.');
+            } else {
+                alert('❌ Login failed: ' + error.message);
+            }
             return;
         }
         
@@ -75,8 +80,15 @@ async function registerUser(username, fullname, password, confirmPassword) {
         }
         
         console.log('✅ Registration successful!', data);
-        alert('✅ Registration successful! Please login.');
-        window.location.href = '/login.html';
+        
+        // If user already exists, try to login instead
+        if (data.user && data.session) {
+            alert('✅ Account created! Please login.');
+            window.location.href = '/login.html';
+        } else {
+            alert('✅ Registration successful! Please check your email to confirm, then login.');
+            window.location.href = '/login.html';
+        }
     } catch (error) {
         console.error('❌ Registration error:', error);
         alert('❌ Error: ' + error.message);
