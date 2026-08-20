@@ -13,18 +13,35 @@
             <div class="nav-brand">🏸 Badminton Booking</div>
             <div class="nav-user">
                 <span id="userName">Welcome, User</span>
+                <button id="adminBtn" class="btn btn-warning btn-sm" style="display:none;">👑 Admin Panel</button>
                 <button id="logoutBtn" class="btn btn-secondary btn-sm">Logout</button>
             </div>
         </nav>
+
         <div class="dashboard">
             <div class="dashboard-header">
                 <h2>📅 Weekly Availability</h2>
-                <p>Select the days you're available to play (10:00 AM)</p>
+                <p>Select the days you're available to play (7:00 AM - 8:00 AM)</p>
+                <div id="deadlineWarning" class="warning-banner" style="display:none;">
+                    ⚠️ Selection deadline has passed. You can view but cannot change your selections.
+                </div>
                 <div id="adminControls" style="display: none;">
                     <p class="admin-badge">👑 Admin Controls</p>
                 </div>
             </div>
-            <div class="days-grid" id="daysGrid"></div>
+
+            <div class="days-grid" id="daysGrid">
+                <!-- Days will be rendered here -->
+            </div>
+
+            <!-- Random Selected Users Display -->
+            <div class="selected-players-section">
+                <h3>🏆 Selected Players for This Week</h3>
+                <div id="selectedPlayersGrid" class="selected-players-grid">
+                    <p style="color: #888;">Loading selected players...</p>
+                </div>
+            </div>
+
             <div class="info-section">
                 <div class="info-card">
                     <h3>📊 How it Works</h3>
@@ -42,7 +59,28 @@
             </div>
         </div>
     </div>
-    <script src="/js/supabase-config.js"></script>
+
+    <!-- Admin Panel Modal -->
+    <div id="adminModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close-btn" id="closeModal">&times;</span>
+            <h2>👑 Admin Panel</h2>
+            <p>Enter admin code to access:</p>
+            <input type="password" id="adminCode" placeholder="Enter admin code">
+            <button id="verifyAdminBtn" class="btn btn-primary">Verify</button>
+            <div id="adminError" style="color: red; display: none;">❌ Incorrect code</div>
+            
+            <div id="adminContent" style="display: none;">
+                <h3>📊 All Users' Availability</h3>
+                <div id="allUsersAvailability">Loading...</div>
+                <hr>
+                <button id="randomSelectAllBtn" class="btn btn-primary">🎲 Random Select All Days</button>
+                <button id="resetAllBtn" class="btn btn-danger">🔄 Reset All</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/supabase-setup.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/booking.js"></script>
 </body>
