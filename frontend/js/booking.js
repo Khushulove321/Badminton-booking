@@ -1,19 +1,19 @@
 // Booking functions
 
+console.log('📚 booking.js loaded');
+
 const ADMIN_CODE = 'admin123';
 
-// Check if selection is allowed (before Sunday 11:59 PM)
 function canEdit() {
     const now = new Date();
     const day = now.getDay();
     const hour = now.getHours();
     const minutes = now.getMinutes();
     
-    // Sunday after 11:59 PM or Monday-Saturday
     if (day === 0 && (hour >= 23 && minutes >= 59)) return false;
     if (day === 0 && hour >= 23) return false;
-    if (day === 0) return true; // Sunday before 11:59 PM
-    return true; // Monday-Saturday
+    if (day === 0) return true;
+    return true;
 }
 
 function isPastDeadline() {
@@ -29,7 +29,7 @@ function isPastDeadline() {
 }
 
 async function getAvailability() {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) return [];
 
     try {
@@ -49,7 +49,7 @@ async function getAvailability() {
 }
 
 async function toggleAvailability(day) {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) {
         window.location.href = '/login.html';
         return;
@@ -82,7 +82,7 @@ async function toggleAvailability(day) {
 }
 
 async function selectRandomUser(day) {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) {
         window.location.href = '/login.html';
         return;
@@ -113,7 +113,7 @@ async function selectRandomUser(day) {
 }
 
 async function resetDay(day) {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) {
         window.location.href = '/login.html';
         return;
@@ -144,7 +144,7 @@ async function resetDay(day) {
 }
 
 async function getMyAvailability() {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) return [];
 
     try {
@@ -163,7 +163,7 @@ async function getMyAvailability() {
 }
 
 async function getAllUsersAvailability() {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) return [];
 
     try {
@@ -182,7 +182,7 @@ async function getAllUsersAvailability() {
 }
 
 async function getSelectedPlayers() {
-    const token = getToken();
+    const token = window.getToken();
     if (!token) return [];
 
     try {
@@ -267,8 +267,8 @@ async function renderDashboard() {
     daysGrid.innerHTML = '<div class="loading">Loading availability...</div>';
     
     try {
-        const user = getCurrentUser();
-        const isAdmin = await checkAdmin();
+        const user = window.getCurrentUser();
+        const isAdmin = await window.checkAdmin();
         const canEditBool = canEdit();
         const pastDeadline = isPastDeadline();
         
@@ -430,12 +430,14 @@ async function loadAllUsersAvailability() {
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('dashboard.html')) {
-        const user = getCurrentUser();
+        console.log('📊 Dashboard page loaded');
+        const user = window.getCurrentUser();
         if (!user) {
             window.location.href = '/login.html';
             return;
         }
         
+        console.log('👤 User:', user);
         renderDashboard();
         setInterval(renderDashboard, 30000);
         

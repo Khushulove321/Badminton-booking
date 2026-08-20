@@ -1,5 +1,11 @@
 console.log('🔍 auth.js loaded');
 
+// Make functions globally available
+window.getCurrentUser = getCurrentUser;
+window.getToken = getToken;
+window.checkAdmin = checkAdmin;
+window.logoutUser = logoutUser;
+
 // Login function
 async function loginUser(username, password) {
     console.log('🔐 Login attempt for:', username);
@@ -38,7 +44,7 @@ async function loginUser(username, password) {
     }
 }
 
-// Register function - Let the trigger handle profile creation
+// Register function
 async function registerUser(username, fullname, password, confirmPassword) {
     console.log('📝 Register attempt for:', username);
     
@@ -91,7 +97,6 @@ async function registerUser(username, fullname, password, confirmPassword) {
         
         if (data.user) {
             console.log('✅ User created:', data.user.email);
-            console.log('✅ Profile will be auto-created by database trigger');
             alert('✅ Registration successful! Please login.');
             window.location.href = '/login.html';
         } else {
@@ -102,6 +107,46 @@ async function registerUser(username, fullname, password, confirmPassword) {
         console.error('❌ Registration error:', error);
         alert('❌ Error: ' + error.message);
     }
+}
+
+function getCurrentUser() {
+    const userData = localStorage.getItem('user');
+    return userData ? JSON.parse(userData) : null;
+}
+
+function getToken() {
+    const session = localStorage.getItem('session');
+    if (session) {
+        const parsed = JSON.parse(session);
+        return parsed?.access_token || null;
+    }
+    return null;
+}
+
+async function checkAdmin() {
+    const user = getCurrentUser();
+    if (!user) return false;
+    
+    try {
+        const { data, error } = await window.supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single();
+            
+        if (error) throw error;
+        return data?.is_admin || false;
+    } catch (error) {
+        console.error('Error checking admin:', error);
+        return false;
+    }
+}
+
+function logoutUser() {
+    window.supabase.auth.signOut();
+    localStorage.removeItem('user');
+    localStorage.removeItem('session');
+    window.location.href = '/';
 }
 
 // Setup based on which page we're on
