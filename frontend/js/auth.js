@@ -1,10 +1,6 @@
 console.log('🔍 auth.js loaded');
 
-// Make sure supabase is available
-if (typeof window.supabase === 'undefined') {
-    console.error('❌ window.supabase is undefined. Please check supabase-setup.js');
-}
-
+// Login function
 async function loginUser(username, password) {
     console.log('🔐 Login attempt for:', username);
     
@@ -17,7 +13,7 @@ async function loginUser(username, password) {
     console.log('✅ Supabase is ready, attempting login...');
     
     try {
-        const email = username + '@badminton.local';
+        const email = username + '@gmail.com';
         console.log('📧 Using email:', email);
         
         const { data, error } = await window.supabase.auth.signInWithPassword({
@@ -42,44 +38,112 @@ async function loginUser(username, password) {
     }
 }
 
+// Register function
+async function registerUser(username, fullname, password, confirmPassword) {
+    console.log('📝 Register attempt for:', username);
+    
+    if (password !== confirmPassword) {
+        alert('❌ Passwords do not match');
+        return;
+    }
+    
+    if (!window.supabase) {
+        console.error('❌ window.supabase is undefined!');
+        alert('❌ Supabase not loaded. Please refresh the page.');
+        return;
+    }
+    
+    try {
+        const email = username + '@gmail.com';
+        console.log('📧 Using email:', email);
+        
+        const { data, error } = await window.supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: { 
+                    username: username,
+                    full_name: fullname
+                }
+            }
+        });
+        
+        if (error) {
+            console.error('❌ Registration error:', error);
+            alert('❌ Registration failed: ' + error.message);
+            return;
+        }
+        
+        console.log('✅ Registration successful!', data);
+        alert('✅ Registration successful! Please login.');
+        window.location.href = '/login.html';
+    } catch (error) {
+        console.error('❌ Registration error:', error);
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+// Setup based on which page we're on
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM loaded');
     console.log('🔍 window.supabase exists?', typeof window.supabase !== 'undefined');
     
-    const form = document.getElementById('loginForm');
-    if (!form) {
-        console.error('❌ Login form not found!');
-        return;
-    }
-    
-    console.log('✅ Login form found');
-    
-    const usernameField = document.getElementById('username');
-    const passwordField = document.getElementById('password');
-    
-    console.log('🔍 Username field:', usernameField ? '✅ Found' : '❌ Not found');
-    console.log('🔍 Password field:', passwordField ? '✅ Found' : '❌ Not found');
-    
-    if (!usernameField || !passwordField) {
-        alert('❌ Form fields missing. Please refresh the page.');
-        return;
-    }
-    
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        console.log('📝 Form submitted');
+    // Check if we're on login page
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        console.log('✅ Login form found');
         
-        const username = usernameField.value.trim();
-        const password = passwordField.value.trim();
+        const usernameField = document.getElementById('username');
+        const passwordField = document.getElementById('password');
         
-        console.log('📝 Username entered:', username);
-        console.log('📝 Password length:', password ? password.length : 0);
+        console.log('🔍 Username field:', usernameField ? '✅ Found' : '❌ Not found');
+        console.log('🔍 Password field:', passwordField ? '✅ Found' : '❌ Not found');
         
-        if (!username || !password) {
-            alert('❌ Please enter both username and password');
+        if (!usernameField || !passwordField) {
+            alert('❌ Form fields missing. Please refresh the page.');
             return;
         }
         
-        loginUser(username, password);
-    });
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('📝 Login form submitted');
+            
+            const username = usernameField.value.trim();
+            const password = passwordField.value.trim();
+            
+            if (!username || !password) {
+                alert('❌ Please enter both username and password');
+                return;
+            }
+            
+            loginUser(username, password);
+        });
+        return;
+    }
+    
+    // Check if we're on register page
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        console.log('✅ Register form found');
+        
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('📝 Register form submitted');
+            
+            const username = document.getElementById('username').value.trim();
+            const fullname = document.getElementById('fullname').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const confirmPassword = document.getElementById('confirmPassword').value.trim();
+            
+            if (!username || !fullname || !password || !confirmPassword) {
+                alert('❌ Please fill in all fields');
+                return;
+            }
+            
+            registerUser(username, fullname, password, confirmPassword);
+        });
+        return;
+    }
+    
+    console.log('ℹ️ Neither login nor register form found');
 });
