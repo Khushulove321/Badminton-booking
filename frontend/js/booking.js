@@ -1,4 +1,4 @@
-// Booking functions - With Simulated Data for Both Weeks
+// Booking functions - Two Week Table with Correct Dates
 
 console.log('📚 booking.js loaded');
 
@@ -25,7 +25,6 @@ const SAMPLE_USERS = [
 
 function getSimulatedThisWeekBookers() {
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    // Randomly assign users to days for this week
     const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
     return dayOrder.map((day, index) => ({
         day: day,
@@ -35,7 +34,6 @@ function getSimulatedThisWeekBookers() {
 
 function getSimulatedNextWeekBookers() {
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    // Different random assignment for next week
     const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
     return dayOrder.map((day, index) => ({
         day: day,
@@ -56,7 +54,6 @@ function toggleTestRun() {
         if (document.getElementById('testRunType')) {
             document.getElementById('testRunType').textContent = '';
         }
-        // Clear simulated data flag
         localStorage.removeItem('simulateSunday');
     } else {
         testRunMode = true;
@@ -66,14 +63,12 @@ function toggleTestRun() {
         document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
         document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
         window.showToast('🧪 Test Run activated - Simulating Monday!', 'success');
-        // Clear simulated data flag
         localStorage.removeItem('simulateSunday');
     }
     renderDashboard();
 }
 
 function simulateSunday() {
-    // Enable test run and Sunday mode
     testRunMode = true;
     localStorage.setItem('testRunMode', 'true');
     localStorage.setItem('simulateSunday', 'true');
@@ -783,7 +778,7 @@ function renderMyAvailability(myAvailability, isBookedDays) {
     }
 }
 
-// ============ TWO WEEK TABLE WITH SIMULATED DATA ============
+// ============ TWO WEEK TABLE WITH CORRECT DATES ============
 async function renderTwoWeekTable() {
     const tbody = document.getElementById('selectedPlayersBody');
     if (!tbody) return;
@@ -791,6 +786,7 @@ async function renderTwoWeekTable() {
     const isSunday = localStorage.getItem('simulateSunday') === 'true';
     const isTestRun = localStorage.getItem('testRunMode') === 'true';
     
+    // Get correct dates for both weeks
     const thisWeekDates = getThisWeekDates();
     const nextWeekDates = getNextWeekDates();
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -816,7 +812,6 @@ async function renderTwoWeekTable() {
     
     // If in Sunday simulation mode and no real data, generate simulated data
     if (isSunday && isTestRun) {
-        // Generate simulated data for both weeks
         const simulatedThisWeek = getSimulatedThisWeekBookers();
         const simulatedNextWeek = getSimulatedNextWeekBookers();
         thisWeekBookers = simulatedThisWeek;
@@ -830,7 +825,7 @@ async function renderTwoWeekTable() {
     for (let i = 0; i < dayOrder.length; i++) {
         const day = dayOrder[i];
         
-        // This week data
+        // THIS WEEK - using getThisWeekDates()
         const thisWeekDateObj = thisWeekDates.find(function(d) { return d.day === day; });
         const thisWeekDateStr = thisWeekDateObj ? thisWeekDateObj.dateString : 'TBD';
         const thisWeekBooker = thisWeekBookers.find(function(b) { return b.day === day; });
@@ -841,7 +836,7 @@ async function renderTwoWeekTable() {
             thisWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
         }
         
-        // Next week data
+        // NEXT WEEK - using getNextWeekDates()
         const nextWeekDateObj = nextWeekDates.find(function(d) { return d.day === day; });
         const nextWeekDateStr = nextWeekDateObj ? nextWeekDateObj.dateString : 'TBD';
         const nextWeekBooker = nextWeekSelected.find(function(b) { return b.day === day; });
@@ -853,14 +848,16 @@ async function renderTwoWeekTable() {
         }
         
         html += '<tr>';
+        // Day column - show the day name and the date for THIS week (as the primary date)
         html += '<td><strong>' + day + '</strong><br><span style="font-size:0.8rem;color:#888;">' + thisWeekDateStr + '</span></td>';
-        html += '<td>' + thisWeekDisplay + '</td>';
-        html += '<td>' + nextWeekDisplay + '</td>';
+        // This Week column - shows the date for this week too
+        html += '<td>' + thisWeekDisplay + '<br><span style="font-size:0.7rem;color:#888;">' + thisWeekDateStr + '</span></td>';
+        // Next Week column - shows the date for next week
+        html += '<td>' + nextWeekDisplay + '<br><span style="font-size:0.7rem;color:#888;">' + nextWeekDateStr + '</span></td>';
         html += '</tr>';
     }
     
     if (!hasData) {
-        // No data at all - show message
         if (isSunday && isTestRun) {
             html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first or check back later.</td></tr>';
         } else {
