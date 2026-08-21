@@ -49,10 +49,6 @@
                         <h2>📅 Weekly Availability</h2>
                         <div class="week-selector">
                             <div id="weekDisplay" class="week-display">Selecting for: Loading...</div>
-                            <div class="week-buttons">
-                                <button id="thisWeekBtn" class="btn btn-secondary btn-sm">This Week</button>
-                                <button id="nextWeekBtn" class="btn btn-primary btn-sm">Next Week</button>
-                            </div>
                         </div>
                         <div id="selectionStatus" class="selection-status">
                             <span class="status-indicator"></span>
@@ -63,17 +59,29 @@
                         </div>
                         <div id="adminControls" style="display: none;">
                             <p class="admin-badge">👑 Admin Controls</p>
-                            <button id="openAllBookingsBtn" class="btn btn-warning">🔓 Open All Bookings</button>
-                            <span id="openAllStatus" style="margin-left:10px;font-size:0.9rem;color:#666;"></span>
                         </div>
                     </div>
 
                     <div class="days-grid" id="daysGrid"></div>
 
+                    <!-- SELECTED PLAYERS TABLE -->
                     <div class="selected-players-section">
-                        <h3>🏆 Selected Players for This Week</h3>
-                        <div id="selectedPlayersGrid" class="selected-players-grid">
-                            <p style="color: #888;">Loading selected players...</p>
+                        <h3>🏆 Court Bookers for Next Week</h3>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
+                            These players will book the court for the week after next. Updated every Sunday night.
+                        </p>
+                        <div id="selectedPlayersTable" class="selected-players-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Day</th>
+                                        <th>Selected Player</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="selectedPlayersBody">
+                                    <tr><td colspan="2" style="text-align:center;color:#888;">Loading selected players...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -84,7 +92,7 @@
                                 <li>Selection opens every Monday (all day)</li>
                                 <li>Select your availability for the NEXT week</li>
                                 <li>Click "In for [Day]" to mark yourself available</li>
-                                <li>Admin will randomly select players after Monday</li>
+                                <li>Selected players are chosen on Sunday night</li>
                             </ul>
                         </div>
                         <div class="info-card" id="myAvailability">
@@ -108,6 +116,14 @@
                 <div class="dashboard">
                     <h2>🔔 Notifications</h2>
                     <div id="notificationsList">Loading notifications...</div>
+                </div>
+            </div>
+
+            <!-- HISTORY VIEW -->
+            <div id="historyView" style="display:none;">
+                <div class="dashboard">
+                    <h2>📜 My History</h2>
+                    <div id="historyList">Loading history...</div>
                 </div>
             </div>
         </div>
