@@ -8,7 +8,101 @@ let selectedBookingId = null;
 let currentUser = null;
 let currentView = 'dashboard';
 
-// RULES DATA
+// ===== TEST RUN MODE =====
+let testRunMode = false;
+let testRunDay = 1; // Monday by default
+
+function toggleTestRun() {
+    const wasActive = testRunMode;
+    if (wasActive) {
+        testRunMode = false;
+        localStorage.removeItem('testRunMode');
+        document.getElementById('testRunStatus').textContent = '';
+        document.getElementById('testRunStatus').style.color = '#666';
+        document.getElementById('testRunBtn').textContent = '🧪 Test Run';
+        document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
+        window.showToast('🔴 Test Run disabled', 'info');
+    } else {
+        testRunMode = true;
+        localStorage.setItem('testRunMode', 'true');
+        document.getElementById('testRunStatus').textContent = '🧪 TEST RUN ACTIVE - Simulating Monday';
+        document.getElementById('testRunStatus').style.color = '#f59e0b';
+        document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
+        document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
+        window.showToast('🧪 Test Run activated - Simulating Monday!', 'success');
+    }
+    renderDashboard();
+}
+
+// Check if Test Run is active on page load
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('testRunMode') === 'true') {
+        testRunMode = true;
+        testRunDay = 1; // Monday
+        const statusEl = document.getElementById('testRunStatus');
+        const btn = document.getElementById('testRunBtn');
+        if (statusEl) {
+            statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday';
+            statusEl.style.color = '#f59e0b';
+        }
+        if (btn) {
+            btn.textContent = '🔴 Disable Test Run';
+            btn.className = 'btn btn-danger btn-sm';
+        }
+    }
+});
+
+// Override the date check functions
+function isSelectionWindowOpen() {
+    const now = new Date();
+    let day = now.getDay();
+    
+    // If Test Run is active, pretend it's Monday
+    if (testRunMode) {
+        console.log('🧪 Test Run: Forcing Monday');
+        return true;
+    }
+    
+    return day === 1; // Normal: Only Monday
+}
+
+function getSelectionStatus() {
+    const now = new Date();
+    const day = now.getDay();
+    
+    // If Test Run is active
+    if (testRunMode) {
+        return {
+            status: 'open',
+            message: '🧪 TEST RUN: Simulating Monday - Selection OPEN',
+            className: 'open'
+        };
+    }
+    
+    if (day !== 1) {
+        const nextMonday = new Date(now);
+        const daysUntilMonday = day === 0 ? 1 : 8 - day;
+        nextMonday.setDate(now.getDate() + daysUntilMonday);
+        const dateStr = nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return {
+            status: 'closed',
+            message: '🔒 Selection opens Monday ' + dateStr + ' (all day)',
+            className: 'closed'
+        };
+    }
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+    const diffMs = endOfDay - now;
+    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return {
+        status: 'open',
+        message: '🔓 Selection OPEN - ' + diffHrs + 'h ' + diffMin + 'm remaining',
+        className: 'open'
+    };
+}
+
+// ============ RULES DATA ============
 const RULES_DATA = [
     {
         category: '📋 Booking Rules',
@@ -147,7 +241,6 @@ async function renderHistoryPage() {
         let html = '<h3>📜 Your Booking History</h3>';
         html += '<p style="color: #666;margin-bottom:20px;">Showing your last 50 records.</p>';
         
-        // Group by month/year
         const grouped = {};
         for (let i = 0; i < history.length; i++) {
             const item = history[i];
@@ -304,41 +397,8 @@ function getNextWeekDates() {
     return weekDates;
 }
 
-function isSelectionWindowOpen() {
-    const now = new Date();
-    const day = now.getDay();
-    return day === 1; // Only Monday
-}
-
 function canEdit() {
     return isSelectionWindowOpen();
-}
-
-function getSelectionStatus() {
-    const now = new Date();
-    const day = now.getDay();
-    
-    if (day !== 1) {
-        const nextMonday = new Date(now);
-        const daysUntilMonday = day === 0 ? 1 : 8 - day;
-        nextMonday.setDate(now.getDate() + daysUntilMonday);
-        const dateStr = nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return {
-            status: 'closed',
-            message: '🔒 Selection opens Monday ' + dateStr + ' (all day)',
-            className: 'closed'
-        };
-    }
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
-    const diffMs = endOfDay - now;
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return {
-        status: 'open',
-        message: '🔓 Selection OPEN - ' + diffHrs + 'h ' + diffMin + 'm remaining',
-        className: 'open'
-    };
 }
 
 async function getAvailability(weekType) {
@@ -609,7 +669,6 @@ function renderSelectedPlayersTable(selected) {
         return;
     }
     
-    // Get the week after next dates for display
     const weekDates = getNextWeekDates();
     
     let html = '';
@@ -617,7 +676,6 @@ function renderSelectedPlayersTable(selected) {
     
     for (let i = 0; i < dayOrder.length; i++) {
         const day = dayOrder[i];
-        // Find if this day has a selected player
         const selectedItem = selected.find(function(item) { return item.day === day; });
         const dateObj = weekDates.find(function(d) { return d.day === day; });
         const dateStr = dateObj ? ' (' + dateObj.dateString + ')' : '';
@@ -653,7 +711,6 @@ function closeOptOutModal() {
     selectedBookingId = null;
 }
 
-let currentWeekView = 'next';
 let isAdmin = false;
 
 async function renderDashboard() {
@@ -955,6 +1012,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         console.log('📊 Dashboard page loaded');
         console.log('👤 User:', user);
+        
+        // Check Test Run status from localStorage
+        if (localStorage.getItem('testRunMode') === 'true') {
+            testRunMode = true;
+        }
+        
         const userName = document.getElementById('userName');
         if (userName) {
             window.supabase
@@ -968,6 +1031,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
         }
+        
         renderDashboard();
         setInterval(renderDashboard, 30000);
         
@@ -1084,5 +1148,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('logoutBtn').addEventListener('click', function() {
             window.logoutUser();
         });
+        
+        // TEST RUN BUTTON
+        const testRunBtn = document.getElementById('testRunBtn');
+        if (testRunBtn) {
+            testRunBtn.addEventListener('click', function() {
+                toggleTestRun();
+            });
+        }
     }
 });
