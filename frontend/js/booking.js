@@ -311,7 +311,11 @@ function switchView(view) {
     
     if (view === 'rules') renderRulesPage();
     if (view === 'notifications') renderNotificationsPage();
-    if (view === 'history') initHistoryPage();
+    if (view === 'history') {
+        if (typeof initHistoryPage === 'function') {
+            initHistoryPage();
+        }
+    }
     closeSidePanel();
 }
 
@@ -585,7 +589,6 @@ async function toggleAvailability(day, date) {
         const data = await response.json();
         window.showToast(data.message, 'success');
         
-        // Record history for selecting a day (played)
         if (data.action === 'added') {
             const today = new Date();
             await recordHistory(
@@ -595,9 +598,6 @@ async function toggleAvailability(day, date) {
                 'Selected availability for ' + day,
                 0
             );
-        } else if (data.action === 'removed') {
-            // If removed, we don't record history for removal
-            // (The opt out handles recording)
         }
         
         return data;
@@ -1074,8 +1074,7 @@ async function handleToggleAvailability(day, date) {
 }
 
 // ============ SELECT RANDOM WITH ADMIN EXCLUSION ============
-const originalRandomSelect = selectRandomUser;
-selectRandomUser = async function(day) {
+async function selectRandomUser(day) {
   const token = window.getToken();
   if (!token) {
     window.location.href = '/login.html';
@@ -1125,11 +1124,10 @@ selectRandomUser = async function(day) {
     window.showToast(error.message || 'Failed to select user', 'error');
     return null;
   }
-};
+}
 
 // ============ REPLACEMENT WITH ADMIN EXCLUSION ============
-const originalOpenReplacementModal = openReplacementModal;
-openReplacementModal = async function(day) {
+async function openReplacementModal(day) {
   document.getElementById('replaceDay').textContent = day;
   document.getElementById('replacementModal').style.display = 'flex';
   const container = document.getElementById('replacementList');
@@ -1184,7 +1182,6 @@ openReplacementModal = async function(day) {
         if (confirmed) {
           const success = await addReplacement(currentUser.id, selectedUserId, day);
           if (success) {
-            // Record history for replacement
             const today = new Date();
             await recordHistory(
               today.toISOString().split('T')[0],
@@ -1208,7 +1205,7 @@ openReplacementModal = async function(day) {
     console.error('Error loading users for replacement:', error);
     container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
   }
-};
+}
 
 // ============ OPT OUT WITH HISTORY RECORDING ============
 async function handleOptOut(day, bookingId, action) {
@@ -1226,7 +1223,6 @@ async function handleOptOut(day, bookingId, action) {
     if (action === 'notBooked') {
         const success = await removeUserFromBooking(day, user.id);
         if (success) {
-            // Record history - no penalty
             await recordHistory(
                 dateStr,
                 'played',
@@ -1250,10 +1246,8 @@ async function handleOptOut(day, bookingId, action) {
     }
     
     if (action === 'penalty') {
-        // First record the penalty
         const penaltySuccess = await recordPenalty(user.id, bookingId);
         if (penaltySuccess) {
-            // Record history for penalty received
             await recordHistory(
                 dateStr,
                 'penalty_received',
@@ -1261,11 +1255,9 @@ async function handleOptOut(day, bookingId, action) {
                 'Penalty received for cancelling after court was booked',
                 10.00
             );
-            // Remove user from booking
             await removeUserFromBooking(day, user.id);
             window.showToast('💰 Penalty recorded. You have been removed from the booking.', 'success');
             closeOptOutModal();
-            // Open penalty modal for payment
             openPenaltyModal(day, bookingId);
             await renderDashboard();
         } else {
