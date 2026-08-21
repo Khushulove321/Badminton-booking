@@ -1,4 +1,4 @@
-// Booking functions - with proper user roles and Sunday updates
+// Booking functions - With History Recording
 
 console.log('📚 booking.js loaded');
 
@@ -8,11 +8,50 @@ let selectedBookingId = null;
 let currentUser = null;
 let currentView = 'dashboard';
 
-// ===== TEST RUN MODE (ADMIN ONLY) =====
+// ===== ADMIN EXCLUSION FUNCTIONS =====
+function isAdminUser(user) {
+  if (!user) return false;
+  if (user.email === 'admin@gmail.com') return true;
+  if (user.username === 'admin') return true;
+  return false;
+}
+
+// ===== HISTORY RECORDING FUNCTION =====
+async function recordHistory(event_date, action_type, day, description, amount = 0, related_user = null) {
+  const token = window.getToken();
+  if (!token) return false;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/record-history`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        event_date: event_date,
+        action_type: action_type,
+        day: day,
+        description: description,
+        amount: amount,
+        related_user: related_user
+      })
+    });
+    
+    if (!response.ok) throw new Error('Failed to record history');
+    console.log('✅ History recorded:', action_type, day);
+    return true;
+  } catch (error) {
+    console.error('Error recording history:', error);
+    return false;
+  }
+}
+
+// ===== TEST RUN MODE =====
 let testRunMode = false;
 let testRunDay = 1;
 
-// Sample users for simulation (only used for admin testing)
+// Sample users for simulation
 const SAMPLE_USERS = [
     { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
     { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
@@ -41,7 +80,6 @@ function getSimulatedNextWeekBookers() {
     }));
 }
 
-// ===== ADMIN TEST FUNCTIONS =====
 function toggleTestRun() {
     const wasActive = testRunMode;
     if (wasActive) {
@@ -86,53 +124,46 @@ function simulateSunday() {
     renderDashboard();
 }
 
-// ===== DATE FUNCTIONS =====
-function getNextWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    let daysUntilNextMonday;
-    if (currentDay === 0) {
-        daysUntilNextMonday = 1;
-    } else if (currentDay === 1) {
-        daysUntilNextMonday = 7;
-    } else {
-        daysUntilNextMonday = 8 - currentDay;
+function disableSimulation() {
+    testRunMode = false;
+    localStorage.removeItem('testRunMode');
+    localStorage.removeItem('simulateSunday');
+    document.getElementById('testRunStatus').textContent = '';
+    document.getElementById('testRunStatus').style.color = '#666';
+    document.getElementById('testRunBtn').textContent = '🧪 Test Run';
+    document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
+    if (document.getElementById('testRunType')) {
+        document.getElementById('testRunType').textContent = '';
     }
-    const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(nextMonday);
-        date.setDate(nextMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
-    }
-    return weekDates;
+    renderDashboard();
 }
 
-function getThisWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const thisMonday = new Date(today);
-    thisMonday.setDate(today.getDate() - daysToMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(thisMonday);
-        date.setDate(thisMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('testRunMode') === 'true') {
+        testRunMode = true;
+        testRunDay = 1;
+        const statusEl = document.getElementById('testRunStatus');
+        const btn = document.getElementById('testRunBtn');
+        const isSunday = localStorage.getItem('simulateSunday') === 'true';
+        if (statusEl) {
+            if (isSunday) {
+                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
+                statusEl.style.color = '#f56565';
+            } else {
+                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
+                statusEl.style.color = '#f59e0b';
+            }
+        }
+        if (btn) {
+            btn.textContent = '🔴 Disable Test Run';
+            btn.className = 'btn btn-danger btn-sm';
+        }
+        if (isSunday && document.getElementById('testRunType')) {
+            document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers';
+            document.getElementById('testRunType').style.color = '#f56565';
+        }
     }
-    return weekDates;
-}
+});
 
 function isSelectionWindowOpen() {
     const now = new Date();
@@ -280,7 +311,7 @@ function switchView(view) {
     
     if (view === 'rules') renderRulesPage();
     if (view === 'notifications') renderNotificationsPage();
-    if (view === 'history') renderHistoryPage();
+    if (view === 'history') initHistoryPage();
     closeSidePanel();
 }
 
@@ -339,7 +370,7 @@ async function renderHistoryPage() {
         const grouped = {};
         for (let i = 0; i < history.length; i++) {
             const item = history[i];
-            const date = new Date(item.created_at);
+            const date = new Date(item.event_date);
             const key = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(item);
@@ -352,15 +383,17 @@ async function renderHistoryPage() {
             html += '<h4 style="color:#2d3748;border-bottom:2px solid #667eea;padding-bottom:5px;">' + monthKey + '</h4>';
             for (let i = 0; i < grouped[monthKey].length; i++) {
                 const item = grouped[monthKey][i];
-                const statusIcon = item.status === 'played' ? '🟢' : 
-                                  item.status === 'cancelled' ? '🟡' : 
-                                  item.status === 'cancelled_with_penalty' ? '🔴' : '💰';
-                const statusText = item.status === 'played' ? 'Played' : 
-                                  item.status === 'cancelled' ? 'Cancelled (No penalty)' : 
-                                  item.status === 'cancelled_with_penalty' ? 'Cancelled (Penalty paid)' : 'Penalty';
+                const statusIcon = item.action_type === 'played' ? '🟢' : 
+                                  item.action_type === 'replacement' ? '🟠' : 
+                                  item.action_type === 'penalty_received' ? '🟡' : 
+                                  item.action_type === 'penalty_paid' ? '🔴' : '⚪';
+                const statusText = item.action_type === 'played' ? 'Played' : 
+                                  item.action_type === 'replacement' ? 'Replacement' : 
+                                  item.action_type === 'penalty_received' ? 'Penalty Received' : 
+                                  item.action_type === 'penalty_paid' ? 'Penalty Paid' : 'Unknown';
                 html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;">';
-                html += '<span>' + statusIcon + ' ' + item.day + ' - ' + new Date(item.created_at).toLocaleDateString() + '</span>';
-                html += '<span style="color:' + (item.status === 'played' ? '#48bb78' : item.status === 'cancelled' ? '#f59e0b' : '#f56565') + ';">' + statusText + '</span>';
+                html += '<span>' + statusIcon + ' ' + item.day + ' - ' + new Date(item.event_date).toLocaleDateString() + '</span>';
+                html += '<span style="color:' + (item.action_type === 'played' ? '#48bb78' : item.action_type === 'replacement' ? '#ed8936' : item.action_type === 'penalty_received' ? '#f6e05e' : '#fc8181') + ';">' + statusText + '</span>';
                 html += '</div>';
             }
             html += '</div>';
@@ -465,6 +498,53 @@ async function payPenalty(penaltyId) {
 }
 
 // ============ DASHBOARD FUNCTIONS ============
+function getNextWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    let daysUntilNextMonday;
+    if (currentDay === 0) {
+        daysUntilNextMonday = 1;
+    } else if (currentDay === 1) {
+        daysUntilNextMonday = 7;
+    } else {
+        daysUntilNextMonday = 8 - currentDay;
+    }
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(nextMonday);
+        date.setDate(nextMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
+}
+
+function getThisWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysToMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(thisMonday);
+        date.setDate(thisMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
+}
+
 async function getAvailability(weekType) {
     const token = window.getToken();
     if (!token) return [];
@@ -499,9 +579,27 @@ async function toggleAvailability(day, date) {
             },
             body: JSON.stringify({ date: date })
         });
+
         if (!response.ok) throw new Error('Failed to update availability');
+        
         const data = await response.json();
         window.showToast(data.message, 'success');
+        
+        // Record history for selecting a day (played)
+        if (data.action === 'added') {
+            const today = new Date();
+            await recordHistory(
+                today.toISOString().split('T')[0],
+                'played',
+                day,
+                'Selected availability for ' + day,
+                0
+            );
+        } else if (data.action === 'removed') {
+            // If removed, we don't record history for removal
+            // (The opt out handles recording)
+        }
+        
         return data;
     } catch (error) {
         console.error('Error updating availability:', error);
@@ -747,19 +845,16 @@ async function renderTwoWeekTable(isAdminUser) {
     const isSunday = localStorage.getItem('simulateSunday') === 'true';
     const isTestRun = localStorage.getItem('testRunMode') === 'true';
     
-    // Get correct dates for both weeks
     const thisWeekDates = getThisWeekDates();
     const nextWeekDates = getNextWeekDates();
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
-    // Show Sunday indicator if active (only for admin)
     if (isSunday && isTestRun && isAdminUser) {
         document.getElementById('sundayIndicator').style.display = 'inline';
     } else {
         document.getElementById('sundayIndicator').style.display = 'none';
     }
     
-    // Get real data
     let thisWeekBookers = [];
     let nextWeekSelected = [];
     
@@ -771,7 +866,6 @@ async function renderTwoWeekTable(isAdminUser) {
         nextWeekSelected = await getNextWeekSelected();
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
-    // If in Sunday simulation mode and admin, generate simulated data
     if (isSunday && isTestRun && isAdminUser) {
         const simulatedThisWeek = getSimulatedThisWeekBookers();
         const simulatedNextWeek = getSimulatedNextWeekBookers();
@@ -779,14 +873,12 @@ async function renderTwoWeekTable(isAdminUser) {
         nextWeekSelected = simulatedNextWeek;
     }
     
-    // Build the table
     let html = '';
     let hasData = false;
     
     for (let i = 0; i < dayOrder.length; i++) {
         const day = dayOrder[i];
         
-        // THIS WEEK
         const thisWeekDateObj = thisWeekDates.find(function(d) { return d.day === day; });
         const thisWeekDateStr = thisWeekDateObj ? thisWeekDateObj.dateString : 'TBD';
         const thisWeekBooker = thisWeekBookers.find(function(b) { return b.day === day; });
@@ -797,7 +889,6 @@ async function renderTwoWeekTable(isAdminUser) {
             thisWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
         }
         
-        // NEXT WEEK
         const nextWeekDateObj = nextWeekDates.find(function(d) { return d.day === day; });
         const nextWeekDateStr = nextWeekDateObj ? nextWeekDateObj.dateString : 'TBD';
         const nextWeekBooker = nextWeekSelected.find(function(b) { return b.day === day; });
@@ -817,14 +908,12 @@ async function renderTwoWeekTable(isAdminUser) {
     
     if (!hasData) {
         if (isAdminUser) {
-            // Admin sees the test message
             if (isSunday && isTestRun) {
                 html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first.</td></tr>';
             } else {
                 html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Click "Simulate Sunday" to see a preview.</td></tr>';
             }
         } else {
-            // Regular user sees the normal message
             html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 The court bookers are updated every Sunday and remain visible for the entire week.</td></tr>';
         }
     }
@@ -984,6 +1073,235 @@ async function handleToggleAvailability(day, date) {
     }
 }
 
+// ============ SELECT RANDOM WITH ADMIN EXCLUSION ============
+const originalRandomSelect = selectRandomUser;
+selectRandomUser = async function(day) {
+  const token = window.getToken();
+  if (!token) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  try {
+    const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch availability');
+    const data = await response.json();
+    const booking = data.find(b => b.day === day);
+    
+    const availableUsers = booking?.available_users?.filter(u => u.email !== 'admin@gmail.com' && u.username !== 'admin') || [];
+    
+    if (availableUsers.length === 0) {
+      window.showToast('❌ No non-admin users available for ' + day, 'error');
+      return null;
+    }
+    
+    const randomIndex = Math.floor(Math.random() * availableUsers.length);
+    const selectedUserId = availableUsers[randomIndex].id;
+    
+    const response2 = await fetch(`${window.API_URL}/booking/select-random/${day}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ force_user_id: selectedUserId })
+    });
+
+    if (!response2.ok) {
+      const errorData = await response2.json();
+      throw new Error(errorData.error || 'Failed to select user');
+    }
+
+    const data2 = await response2.json();
+    window.showToast(`🎯 Random user selected for ${day}!`, 'success');
+    return data2;
+  } catch (error) {
+    console.error('Error selecting user:', error);
+    window.showToast(error.message || 'Failed to select user', 'error');
+    return null;
+  }
+};
+
+// ============ REPLACEMENT WITH ADMIN EXCLUSION ============
+const originalOpenReplacementModal = openReplacementModal;
+openReplacementModal = async function(day) {
+  document.getElementById('replaceDay').textContent = day;
+  document.getElementById('replacementModal').style.display = 'flex';
+  const container = document.getElementById('replacementList');
+  container.innerHTML = 'Loading users...';
+  
+  try {
+    const allUsers = await getAllUsers();
+    const currentUser = window.getCurrentUser();
+    
+    const availableUsers = allUsers.filter(function(user) {
+      return user.id !== currentUser?.id && 
+             user.email !== 'admin@gmail.com' && 
+             user.username !== 'admin';
+    });
+    
+    if (availableUsers.length === 0) {
+      container.innerHTML = '<p style="color: #888;">No other non-admin users found.</p>';
+      return;
+    }
+    
+    let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
+    html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
+    html += '<option value="">-- Select a user --</option>';
+    
+    for (let i = 0; i < availableUsers.length; i++) {
+      const user = availableUsers[i];
+      const displayName = user.full_name || user.username;
+      html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
+    }
+    
+    html += '</select>';
+    html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
+    html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
+    
+    container.innerHTML = html;
+    
+    const confirmBtn = document.getElementById('confirmReplacementBtn');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async function() {
+        const select = document.getElementById('replacementSelect');
+        const selectedUserId = select?.value;
+        const selectedUsername = select?.options[select.selectedIndex]?.text || '';
+        
+        if (!selectedUserId) {
+          document.getElementById('replacementError').style.display = 'block';
+          return;
+        }
+        
+        document.getElementById('replacementError').style.display = 'none';
+        
+        const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
+        if (confirmed) {
+          const success = await addReplacement(currentUser.id, selectedUserId, day);
+          if (success) {
+            // Record history for replacement
+            const today = new Date();
+            await recordHistory(
+              today.toISOString().split('T')[0],
+              'replacement',
+              day,
+              'Replaced ' + currentUser.username + ' with ' + selectedUsername,
+              0,
+              selectedUsername
+            );
+            window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
+            document.getElementById('replacementModal').style.display = 'none';
+            await renderDashboard();
+          } else {
+            window.showToast('❌ Failed to add replacement. Please try again.', 'error');
+          }
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error loading users for replacement:', error);
+    container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
+  }
+};
+
+// ============ OPT OUT WITH HISTORY RECORDING ============
+async function handleOptOut(day, bookingId, action) {
+    const user = window.getCurrentUser();
+    if (!user) return;
+    
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    
+    if (action === 'cancel') {
+        closeOptOutModal();
+        return;
+    }
+    
+    if (action === 'notBooked') {
+        const success = await removeUserFromBooking(day, user.id);
+        if (success) {
+            // Record history - no penalty
+            await recordHistory(
+                dateStr,
+                'played',
+                day,
+                'Cancelled before court was booked (No penalty)',
+                0
+            );
+            window.showToast('✅ You have been removed. No penalty applied.', 'success');
+            closeOptOutModal();
+            await renderDashboard();
+        } else {
+            window.showToast('❌ Failed to remove you. Please try again.', 'error');
+        }
+        return;
+    }
+    
+    if (action === 'replace') {
+        closeOptOutModal();
+        await openReplacementModal(day);
+        return;
+    }
+    
+    if (action === 'penalty') {
+        // First record the penalty
+        const penaltySuccess = await recordPenalty(user.id, bookingId);
+        if (penaltySuccess) {
+            // Record history for penalty received
+            await recordHistory(
+                dateStr,
+                'penalty_received',
+                day,
+                'Penalty received for cancelling after court was booked',
+                10.00
+            );
+            // Remove user from booking
+            await removeUserFromBooking(day, user.id);
+            window.showToast('💰 Penalty recorded. You have been removed from the booking.', 'success');
+            closeOptOutModal();
+            // Open penalty modal for payment
+            openPenaltyModal(day, bookingId);
+            await renderDashboard();
+        } else {
+            window.showToast('❌ Failed to process penalty. Please try again.', 'error');
+        }
+        return;
+    }
+}
+
+// ============ PENALTY PAY WITH HISTORY ============
+async function handlePenaltyPay(bookingId, day) {
+    const user = window.getCurrentUser();
+    if (!user) return;
+    const confirmed = confirm('⚠️ Are you sure you want to pay the $10.00 penalty? This cannot be undone.');
+    if (confirmed) {
+        const success = await recordPenalty(user.id, bookingId);
+        if (success) {
+            const today = new Date();
+            await recordHistory(
+                today.toISOString().split('T')[0],
+                'penalty_paid',
+                day,
+                'Paid $10.00 penalty',
+                10.00
+            );
+            await removeUserFromBooking(day, user.id);
+            window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
+            document.getElementById('penaltyModal').style.display = 'none';
+            await renderDashboard();
+            await renderNotificationsPage();
+        } else {
+            window.showToast('❌ Failed to process penalty. Please try again.', 'error');
+        }
+    }
+}
+
 // ============ ADMIN PANEL ============
 async function openAdminPanel() {
     const modal = document.getElementById('adminModal');
@@ -1039,128 +1357,10 @@ async function loadAllUsersAvailability() {
     }
 }
 
-// ============ REPLACEMENT WITH ALL USERS ============
-async function openReplacementModal(day) {
-    document.getElementById('replaceDay').textContent = day;
-    document.getElementById('replacementModal').style.display = 'flex';
-    const container = document.getElementById('replacementList');
-    container.innerHTML = 'Loading users...';
-    
-    try {
-        const allUsers = await getAllUsers();
-        const currentUser = window.getCurrentUser();
-        const availableUsers = allUsers.filter(function(user) {
-            return user.id !== currentUser?.id;
-        });
-        
-        if (availableUsers.length === 0) {
-            container.innerHTML = '<p style="color: #888;">No other users found in the system.</p>';
-            return;
-        }
-        
-        let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users:</p>';
-        html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
-        html += '<option value="">-- Select a user --</option>';
-        
-        for (let i = 0; i < availableUsers.length; i++) {
-            const user = availableUsers[i];
-            const displayName = user.full_name || user.username;
-            html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
-        }
-        
-        html += '</select>';
-        html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
-        html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
-        
-        container.innerHTML = html;
-        
-        const confirmBtn = document.getElementById('confirmReplacementBtn');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', async function() {
-                const select = document.getElementById('replacementSelect');
-                const selectedUserId = select?.value;
-                const selectedUsername = select?.options[select.selectedIndex]?.text || '';
-                
-                if (!selectedUserId) {
-                    document.getElementById('replacementError').style.display = 'block';
-                    return;
-                }
-                
-                document.getElementById('replacementError').style.display = 'none';
-                
-                const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
-                if (confirmed) {
-                    const success = await addReplacement(currentUser.id, selectedUserId, day);
-                    if (success) {
-                        window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
-                        document.getElementById('replacementModal').style.display = 'none';
-                        await renderDashboard();
-                    } else {
-                        window.showToast('❌ Failed to add replacement. Please try again.', 'error');
-                    }
-                }
-            });
-        }
-        
-    } catch (error) {
-        console.error('Error loading users for replacement:', error);
-        container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
-    }
-}
-
-// ============ OPT OUT HANDLERS ============
-async function handleOptOut(day, bookingId, action) {
-    const user = window.getCurrentUser();
-    if (!user) return;
-    if (action === 'cancel') {
-        closeOptOutModal();
-        return;
-    }
-    if (action === 'notBooked') {
-        const success = await removeUserFromBooking(day, user.id);
-        if (success) {
-            window.showToast('✅ You have been removed. No penalty applied.', 'success');
-            closeOptOutModal();
-            await renderDashboard();
-        } else {
-            window.showToast('❌ Failed to remove you. Please try again.', 'error');
-        }
-        return;
-    }
-    if (action === 'replace') {
-        closeOptOutModal();
-        await openReplacementModal(day);
-        return;
-    }
-    if (action === 'penalty') {
-        closeOptOutModal();
-        openPenaltyModal(day, bookingId);
-        return;
-    }
-}
-
 function openPenaltyModal(day, bookingId) {
     document.getElementById('penaltyModal').style.display = 'flex';
     document.getElementById('penaltyPay').dataset.bookingId = bookingId;
     document.getElementById('penaltyPay').dataset.day = day;
-}
-
-async function handlePenaltyPay(bookingId, day) {
-    const user = window.getCurrentUser();
-    if (!user) return;
-    const confirmed = confirm('⚠️ Are you sure you want to pay the $10.00 penalty? This cannot be undone.');
-    if (confirmed) {
-        const success = await recordPenalty(user.id, bookingId);
-        if (success) {
-            await removeUserFromBooking(day, user.id);
-            window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
-            document.getElementById('penaltyModal').style.display = 'none';
-            await renderDashboard();
-            await renderNotificationsPage();
-        } else {
-            window.showToast('❌ Failed to process penalty. Please try again.', 'error');
-        }
-    }
 }
 
 // ============ INITIALIZATION ============
@@ -1309,7 +1509,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.logoutUser();
         });
         
-        // TEST RUN BUTTONS (only visible to admins - handled in HTML)
+        // TEST RUN BUTTONS
         const testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
@@ -1325,146 +1525,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
-
-// ===== ADMIN EXCLUSION FUNCTIONS =====
-function isAdminUser(user) {
-  // Check if the user is the admin account
-  if (!user) return false;
-  // Check by email
-  if (user.email === 'admin@gmail.com') return true;
-  // Check by username
-  if (user.username === 'admin') return true;
-  return false;
-}
-
-// Override the random select function to exclude admin
-const originalRandomSelect = selectRandomUser;
-selectRandomUser = async function(day) {
-  const token = window.getToken();
-  if (!token) {
-    window.location.href = '/login.html';
-    return;
-  }
-
-  try {
-    // First, get all available users for this day
-    const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch availability');
-    const data = await response.json();
-    const booking = data.find(b => b.day === day);
-    
-    // Filter out admin
-    const availableUsers = booking?.available_users?.filter(u => u.email !== 'admin@gmail.com' && u.username !== 'admin') || [];
-    
-    if (availableUsers.length === 0) {
-      window.showToast('❌ No non-admin users available for ' + day, 'error');
-      return null;
-    }
-    
-    // Randomly select from filtered list
-    const randomIndex = Math.floor(Math.random() * availableUsers.length);
-    const selectedUserId = availableUsers[randomIndex].id;
-    
-    // Call the original random select with the chosen user
-    const response2 = await fetch(`${window.API_URL}/booking/select-random/${day}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ force_user_id: selectedUserId })
-    });
-
-    if (!response2.ok) {
-      const errorData = await response2.json();
-      throw new Error(errorData.error || 'Failed to select user');
-    }
-
-    const data2 = await response2.json();
-    window.showToast(`🎯 Random user selected for ${day}!`, 'success');
-    return data2;
-  } catch (error) {
-    console.error('Error selecting user:', error);
-    window.showToast(error.message || 'Failed to select user', 'error');
-    return null;
-  }
-};
-
-// Override replacement function to exclude admin
-const originalOpenReplacementModal = openReplacementModal;
-openReplacementModal = async function(day) {
-  document.getElementById('replaceDay').textContent = day;
-  document.getElementById('replacementModal').style.display = 'flex';
-  const container = document.getElementById('replacementList');
-  container.innerHTML = 'Loading users...';
-  
-  try {
-    const allUsers = await getAllUsers();
-    const currentUser = window.getCurrentUser();
-    
-    // Filter out admin and current user
-    const availableUsers = allUsers.filter(function(user) {
-      return user.id !== currentUser?.id && 
-             user.email !== 'admin@gmail.com' && 
-             user.username !== 'admin';
-    });
-    
-    if (availableUsers.length === 0) {
-      container.innerHTML = '<p style="color: #888;">No other non-admin users found.</p>';
-      return;
-    }
-    
-    let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
-    html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
-    html += '<option value="">-- Select a user --</option>';
-    
-    for (let i = 0; i < availableUsers.length; i++) {
-      const user = availableUsers[i];
-      const displayName = user.full_name || user.username;
-      html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
-    }
-    
-    html += '</select>';
-    html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
-    html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
-    
-    container.innerHTML = html;
-    
-    const confirmBtn = document.getElementById('confirmReplacementBtn');
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', async function() {
-        const select = document.getElementById('replacementSelect');
-        const selectedUserId = select?.value;
-        const selectedUsername = select?.options[select.selectedIndex]?.text || '';
-        
-        if (!selectedUserId) {
-          document.getElementById('replacementError').style.display = 'block';
-          return;
-        }
-        
-        document.getElementById('replacementError').style.display = 'none';
-        
-        const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
-        if (confirmed) {
-          const success = await addReplacement(currentUser.id, selectedUserId, day);
-          if (success) {
-            window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
-            document.getElementById('replacementModal').style.display = 'none';
-            await renderDashboard();
-          } else {
-            window.showToast('❌ Failed to add replacement. Please try again.', 'error');
-          }
-        }
-      });
-    }
-    
-  } catch (error) {
-    console.error('Error loading users for replacement:', error);
-    container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
-  }
-};
