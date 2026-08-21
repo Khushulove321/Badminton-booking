@@ -1,4 +1,4 @@
-// Booking functions - Two Week Table with Correct Dates
+// Booking functions - with proper user roles and Sunday updates
 
 console.log('📚 booking.js loaded');
 
@@ -8,11 +8,11 @@ let selectedBookingId = null;
 let currentUser = null;
 let currentView = 'dashboard';
 
-// ===== TEST RUN MODE =====
+// ===== TEST RUN MODE (ADMIN ONLY) =====
 let testRunMode = false;
 let testRunDay = 1;
 
-// Sample users for simulation
+// Sample users for simulation (only used for admin testing)
 const SAMPLE_USERS = [
     { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
     { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
@@ -41,6 +41,7 @@ function getSimulatedNextWeekBookers() {
     }));
 }
 
+// ===== ADMIN TEST FUNCTIONS =====
 function toggleTestRun() {
     const wasActive = testRunMode;
     if (wasActive) {
@@ -85,46 +86,53 @@ function simulateSunday() {
     renderDashboard();
 }
 
-function disableSimulation() {
-    testRunMode = false;
-    localStorage.removeItem('testRunMode');
-    localStorage.removeItem('simulateSunday');
-    document.getElementById('testRunStatus').textContent = '';
-    document.getElementById('testRunStatus').style.color = '#666';
-    document.getElementById('testRunBtn').textContent = '🧪 Test Run';
-    document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
-    if (document.getElementById('testRunType')) {
-        document.getElementById('testRunType').textContent = '';
+// ===== DATE FUNCTIONS =====
+function getNextWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    let daysUntilNextMonday;
+    if (currentDay === 0) {
+        daysUntilNextMonday = 1;
+    } else if (currentDay === 1) {
+        daysUntilNextMonday = 7;
+    } else {
+        daysUntilNextMonday = 8 - currentDay;
     }
-    renderDashboard();
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(nextMonday);
+        date.setDate(nextMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    if (localStorage.getItem('testRunMode') === 'true') {
-        testRunMode = true;
-        testRunDay = 1;
-        const statusEl = document.getElementById('testRunStatus');
-        const btn = document.getElementById('testRunBtn');
-        const isSunday = localStorage.getItem('simulateSunday') === 'true';
-        if (statusEl) {
-            if (isSunday) {
-                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
-                statusEl.style.color = '#f56565';
-            } else {
-                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
-                statusEl.style.color = '#f59e0b';
-            }
-        }
-        if (btn) {
-            btn.textContent = '🔴 Disable Test Run';
-            btn.className = 'btn btn-danger btn-sm';
-        }
-        if (isSunday && document.getElementById('testRunType')) {
-            document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers';
-            document.getElementById('testRunType').style.color = '#f56565';
-        }
+function getThisWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysToMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(thisMonday);
+        date.setDate(thisMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
     }
-});
+    return weekDates;
+}
 
 function isSelectionWindowOpen() {
     const now = new Date();
@@ -183,6 +191,10 @@ function getSelectionStatus() {
         message: '🔓 Selection OPEN - ' + diffHrs + 'h ' + diffMin + 'm remaining',
         className: 'open'
     };
+}
+
+function canEdit() {
+    return isSelectionWindowOpen();
 }
 
 // ============ RULES DATA ============
@@ -453,57 +465,6 @@ async function payPenalty(penaltyId) {
 }
 
 // ============ DASHBOARD FUNCTIONS ============
-function getNextWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    let daysUntilNextMonday;
-    if (currentDay === 0) {
-        daysUntilNextMonday = 1;
-    } else if (currentDay === 1) {
-        daysUntilNextMonday = 7;
-    } else {
-        daysUntilNextMonday = 8 - currentDay;
-    }
-    const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(nextMonday);
-        date.setDate(nextMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
-    }
-    return weekDates;
-}
-
-function getThisWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const thisMonday = new Date(today);
-    thisMonday.setDate(today.getDate() - daysToMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(thisMonday);
-        date.setDate(thisMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
-    }
-    return weekDates;
-}
-
-function canEdit() {
-    return isSelectionWindowOpen();
-}
-
 async function getAvailability(weekType) {
     const token = window.getToken();
     if (!token) return [];
@@ -778,8 +739,8 @@ function renderMyAvailability(myAvailability, isBookedDays) {
     }
 }
 
-// ============ TWO WEEK TABLE WITH CORRECT DATES ============
-async function renderTwoWeekTable() {
+// ============ TWO WEEK TABLE ============
+async function renderTwoWeekTable(isAdminUser) {
     const tbody = document.getElementById('selectedPlayersBody');
     if (!tbody) return;
     
@@ -791,14 +752,14 @@ async function renderTwoWeekTable() {
     const nextWeekDates = getNextWeekDates();
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
-    // Show Sunday indicator if active
-    if (isSunday && isTestRun) {
+    // Show Sunday indicator if active (only for admin)
+    if (isSunday && isTestRun && isAdminUser) {
         document.getElementById('sundayIndicator').style.display = 'inline';
     } else {
         document.getElementById('sundayIndicator').style.display = 'none';
     }
     
-    // Get real data (or empty)
+    // Get real data
     let thisWeekBookers = [];
     let nextWeekSelected = [];
     
@@ -810,8 +771,8 @@ async function renderTwoWeekTable() {
         nextWeekSelected = await getNextWeekSelected();
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
-    // If in Sunday simulation mode and no real data, generate simulated data
-    if (isSunday && isTestRun) {
+    // If in Sunday simulation mode and admin, generate simulated data
+    if (isSunday && isTestRun && isAdminUser) {
         const simulatedThisWeek = getSimulatedThisWeekBookers();
         const simulatedNextWeek = getSimulatedNextWeekBookers();
         thisWeekBookers = simulatedThisWeek;
@@ -825,7 +786,7 @@ async function renderTwoWeekTable() {
     for (let i = 0; i < dayOrder.length; i++) {
         const day = dayOrder[i];
         
-        // THIS WEEK - using getThisWeekDates()
+        // THIS WEEK
         const thisWeekDateObj = thisWeekDates.find(function(d) { return d.day === day; });
         const thisWeekDateStr = thisWeekDateObj ? thisWeekDateObj.dateString : 'TBD';
         const thisWeekBooker = thisWeekBookers.find(function(b) { return b.day === day; });
@@ -836,7 +797,7 @@ async function renderTwoWeekTable() {
             thisWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
         }
         
-        // NEXT WEEK - using getNextWeekDates()
+        // NEXT WEEK
         const nextWeekDateObj = nextWeekDates.find(function(d) { return d.day === day; });
         const nextWeekDateStr = nextWeekDateObj ? nextWeekDateObj.dateString : 'TBD';
         const nextWeekBooker = nextWeekSelected.find(function(b) { return b.day === day; });
@@ -848,20 +809,23 @@ async function renderTwoWeekTable() {
         }
         
         html += '<tr>';
-        // Day column - show the day name and the date for THIS week (as the primary date)
         html += '<td><strong>' + day + '</strong><br><span style="font-size:0.8rem;color:#888;">' + thisWeekDateStr + '</span></td>';
-        // This Week column - shows the date for this week too
         html += '<td>' + thisWeekDisplay + '<br><span style="font-size:0.7rem;color:#888;">' + thisWeekDateStr + '</span></td>';
-        // Next Week column - shows the date for next week
         html += '<td>' + nextWeekDisplay + '<br><span style="font-size:0.7rem;color:#888;">' + nextWeekDateStr + '</span></td>';
         html += '</tr>';
     }
     
     if (!hasData) {
-        if (isSunday && isTestRun) {
-            html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first or check back later.</td></tr>';
+        if (isAdminUser) {
+            // Admin sees the test message
+            if (isSunday && isTestRun) {
+                html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first.</td></tr>';
+            } else {
+                html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Click "Simulate Sunday" to see a preview.</td></tr>';
+            }
         } else {
-            html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">No bookings found. Click "Simulate Sunday" to see a preview.</td></tr>';
+            // Regular user sees the normal message
+            html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 The court bookers are updated every Sunday and remain visible for the entire week.</td></tr>';
         }
     }
     
@@ -982,7 +946,7 @@ async function renderDashboard() {
         }
         const myAvailability = await getMyAvailability();
         renderMyAvailability(myAvailability, bookedDays);
-        await renderTwoWeekTable();
+        await renderTwoWeekTable(isAdmin);
         await checkNotifications();
     } catch (error) {
         console.error('Error rendering dashboard:', error);
@@ -1345,7 +1309,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.logoutUser();
         });
         
-        // TEST RUN BUTTONS
+        // TEST RUN BUTTONS (only visible to admins - handled in HTML)
         const testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
