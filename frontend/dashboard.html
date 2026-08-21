@@ -4,15 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Badminton Booking</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="/frontend/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <!-- Side Panel -->
+    <!-- OVERLAY -->
+    <div class="panel-overlay" id="panelOverlay"></div>
+
+    <!-- SIDE PANEL -->
     <div class="side-panel" id="sidePanel">
         <div class="panel-header">
             <h2>🏸 Menu</h2>
-            <button id="closePanel" class="btn btn-sm btn-secondary">&times;</button>
+            <button id="closePanel">&times;</button>
         </div>
         <div class="panel-content">
             <button class="panel-btn" id="panelMyAvailability">📅 My Availability</button>
@@ -25,21 +28,21 @@
         </div>
     </div>
 
-    <!-- Main Content -->
+    <!-- MAIN CONTENT -->
     <div class="main-content" id="mainContent">
         <nav class="navbar">
             <button id="menuToggle" class="btn btn-secondary btn-sm">☰ Menu</button>
             <div class="nav-brand">🏸 Badminton Booking</div>
             <div class="nav-user">
                 <span id="userName">Welcome, User</span>
-                <span id="notificationBadge" class="badge" style="display:none;background:#f56565;color:white;padding:2px 8px;border-radius:12px;font-size:0.7rem;">0</span>
+                <span id="notificationBadge" class="badge" style="display:none;">0</span>
                 <button id="logoutBtn" class="btn btn-secondary btn-sm" style="display:none;">Logout</button>
             </div>
         </nav>
 
-        <!-- Main Content Area -->
+        <!-- MAIN CONTENT AREA -->
         <div id="mainContentArea">
-            <!-- Dashboard View -->
+            <!-- DASHBOARD VIEW -->
             <div id="dashboardView">
                 <div class="dashboard">
                     <div class="dashboard-header">
@@ -65,9 +68,7 @@
                         </div>
                     </div>
 
-                    <div class="days-grid" id="daysGrid">
-                        <!-- Days will be rendered here -->
-                    </div>
+                    <div class="days-grid" id="daysGrid"></div>
 
                     <div class="selected-players-section">
                         <h3>🏆 Selected Players for This Week</h3>
@@ -94,29 +95,25 @@
                 </div>
             </div>
 
-            <!-- Rules View -->
+            <!-- RULES VIEW -->
             <div id="rulesView" style="display:none;">
                 <div class="dashboard">
                     <h2>📋 Rules & Penalties</h2>
-                    <div class="rules-content">
-                        <!-- Rules will be rendered here -->
-                    </div>
+                    <div class="rules-content"></div>
                 </div>
             </div>
 
-            <!-- Notifications View -->
+            <!-- NOTIFICATIONS VIEW -->
             <div id="notificationsView" style="display:none;">
                 <div class="dashboard">
                     <h2>🔔 Notifications</h2>
-                    <div id="notificationsList">
-                        Loading notifications...
-                    </div>
+                    <div id="notificationsList">Loading notifications...</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Opt Out Modal -->
+    <!-- MODALS -->
     <div id="optOutModal" class="modal" style="display:none;">
         <div class="modal-content">
             <button class="close-btn" id="closeOptOutModal">&times;</button>
@@ -131,20 +128,16 @@
         </div>
     </div>
 
-    <!-- Replacement Modal -->
     <div id="replacementModal" class="modal" style="display:none;">
         <div class="modal-content">
             <button class="close-btn" id="closeReplacementModal">&times;</button>
             <h2>🔄 Select Replacement</h2>
             <p>Choose a player to take your spot for <strong id="replaceDay"></strong>:</p>
-            <div id="replacementList" class="replacement-list">
-                Loading players...
-            </div>
+            <div id="replacementList" class="replacement-list">Loading players...</div>
             <button id="replacementCancel" class="btn btn-secondary" style="margin-top:15px;">Cancel</button>
         </div>
     </div>
 
-    <!-- Penalty Modal -->
     <div id="penaltyModal" class="modal" style="display:none;">
         <div class="modal-content">
             <button class="close-btn" id="closePenaltyModal">&times;</button>
@@ -162,7 +155,6 @@
         </div>
     </div>
 
-    <!-- Admin Panel Modal -->
     <div id="adminModal" class="modal" style="display:none;">
         <div class="modal-content">
             <button class="close-btn" id="closeAdminModal">&times;</button>
@@ -171,7 +163,6 @@
             <input type="password" id="adminCode" placeholder="Enter admin code" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin:10px 0;">
             <button id="verifyAdminBtn" class="btn btn-primary" style="width:100%;">Verify</button>
             <div id="adminError" style="color: red; display: none; margin-top:10px;">❌ Incorrect code</div>
-            
             <div id="adminContent" style="display: none; margin-top:20px;">
                 <h3>📊 All Users' Availability</h3>
                 <div id="allUsersAvailability">Loading...</div>
@@ -179,8 +170,8 @@
         </div>
     </div>
 
-    <script src="js/supabase-setup.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/booking.js"></script>
+    <script src="/js/supabase-setup.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/booking.js"></script>
 </body>
 </html>
