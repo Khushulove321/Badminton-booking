@@ -1325,3 +1325,146 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// ===== ADMIN EXCLUSION FUNCTIONS =====
+function isAdminUser(user) {
+  // Check if the user is the admin account
+  if (!user) return false;
+  // Check by email
+  if (user.email === 'admin@gmail.com') return true;
+  // Check by username
+  if (user.username === 'admin') return true;
+  return false;
+}
+
+// Override the random select function to exclude admin
+const originalRandomSelect = selectRandomUser;
+selectRandomUser = async function(day) {
+  const token = window.getToken();
+  if (!token) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  try {
+    // First, get all available users for this day
+    const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch availability');
+    const data = await response.json();
+    const booking = data.find(b => b.day === day);
+    
+    // Filter out admin
+    const availableUsers = booking?.available_users?.filter(u => u.email !== 'admin@gmail.com' && u.username !== 'admin') || [];
+    
+    if (availableUsers.length === 0) {
+      window.showToast('❌ No non-admin users available for ' + day, 'error');
+      return null;
+    }
+    
+    // Randomly select from filtered list
+    const randomIndex = Math.floor(Math.random() * availableUsers.length);
+    const selectedUserId = availableUsers[randomIndex].id;
+    
+    // Call the original random select with the chosen user
+    const response2 = await fetch(`${window.API_URL}/booking/select-random/${day}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ force_user_id: selectedUserId })
+    });
+
+    if (!response2.ok) {
+      const errorData = await response2.json();
+      throw new Error(errorData.error || 'Failed to select user');
+    }
+
+    const data2 = await response2.json();
+    window.showToast(`🎯 Random user selected for ${day}!`, 'success');
+    return data2;
+  } catch (error) {
+    console.error('Error selecting user:', error);
+    window.showToast(error.message || 'Failed to select user', 'error');
+    return null;
+  }
+};
+
+// Override replacement function to exclude admin
+const originalOpenReplacementModal = openReplacementModal;
+openReplacementModal = async function(day) {
+  document.getElementById('replaceDay').textContent = day;
+  document.getElementById('replacementModal').style.display = 'flex';
+  const container = document.getElementById('replacementList');
+  container.innerHTML = 'Loading users...';
+  
+  try {
+    const allUsers = await getAllUsers();
+    const currentUser = window.getCurrentUser();
+    
+    // Filter out admin and current user
+    const availableUsers = allUsers.filter(function(user) {
+      return user.id !== currentUser?.id && 
+             user.email !== 'admin@gmail.com' && 
+             user.username !== 'admin';
+    });
+    
+    if (availableUsers.length === 0) {
+      container.innerHTML = '<p style="color: #888;">No other non-admin users found.</p>';
+      return;
+    }
+    
+    let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
+    html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
+    html += '<option value="">-- Select a user --</option>';
+    
+    for (let i = 0; i < availableUsers.length; i++) {
+      const user = availableUsers[i];
+      const displayName = user.full_name || user.username;
+      html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
+    }
+    
+    html += '</select>';
+    html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
+    html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
+    
+    container.innerHTML = html;
+    
+    const confirmBtn = document.getElementById('confirmReplacementBtn');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async function() {
+        const select = document.getElementById('replacementSelect');
+        const selectedUserId = select?.value;
+        const selectedUsername = select?.options[select.selectedIndex]?.text || '';
+        
+        if (!selectedUserId) {
+          document.getElementById('replacementError').style.display = 'block';
+          return;
+        }
+        
+        document.getElementById('replacementError').style.display = 'none';
+        
+        const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
+        if (confirmed) {
+          const success = await addReplacement(currentUser.id, selectedUserId, day);
+          if (success) {
+            window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
+            document.getElementById('replacementModal').style.display = 'none';
+            await renderDashboard();
+          } else {
+            window.showToast('❌ Failed to add replacement. Please try again.', 'error');
+          }
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error loading users for replacement:', error);
+    container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
+  }
+};

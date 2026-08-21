@@ -420,3 +420,96 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+
+// Get user's history with all events
+app.get('/api/booking/my-history', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get history from the history table
+    const { data: history, error } = await supabaseAdmin
+      .from('history')
+      .select('*')
+      .eq('user_id', userId)
+      .order('event_date', { ascending: false })
+      .limit(100);
+      
+    if (error) {
+      console.error('❌ History error:', error);
+      // If table doesn't exist, return empty array
+      return res.json([]);
+    }
+    
+    // Format the response with nice date strings
+    const formatted = history.map(item => ({
+      id: item.id,
+      event_date: item.event_date,
+      action_type: item.action_type,
+      day: item.day,
+      description: item.description,
+      amount: item.amount || 0,
+      related_user: item.related_user,
+      created_at: item.created_at
+    }));
+    
+    res.json(formatted || []);
+  } catch (error) {
+    console.error('Error fetching history:', error);
+    res.json([]);
+  }
+});
+
+// Record history event (called by other actions)
+app.post('/api/booking/record-history', authenticate, async (req, res) => {
+  try {
+    const { event_date, action_type, day, description, amount, related_user } = req.body;
+    const userId = req.user.id;
+    
+    const { data, error } = await supabaseAdmin
+      .from('history')
+      .insert({
+        user_id: userId,
+        event_date: event_date,
+        action_type: action_type,
+        day: day,
+        description: description,
+        amount: amount || 0,
+        related_user: related_user || null
+      })
+      .select();
+      
+    if (error) throw error;
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error recording history:', error);
+    res.status(500).json({ error: 'Error recording history' });
+  }
+});
+
+// Get monthly history for calendar
+app.get('/api/booking/monthly-history', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { year, month } = req.query;
+    
+    // Get history for specific month
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.padStart(2, '0')}-31`;
+    
+    const { data: history, error } = await supabaseAdmin
+      .from('history')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('event_date', startDate)
+      .lte('event_date', endDate)
+      .order('event_date', { ascending: true });
+      
+    if (error) throw error;
+    
+    res.json(history || []);
+  } catch (error) {
+    console.error('Error fetching monthly history:', error);
+    res.json([]);
+  }
+});
