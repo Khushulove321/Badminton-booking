@@ -4,26 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Badminton Booking</title>
-    <link rel="stylesheet" href="/frontend/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div class="container">
+    <!-- Side Panel -->
+    <div class="side-panel" id="sidePanel">
+        <div class="panel-header">
+            <h2>🏸 Menu</h2>
+            <button id="closePanel" class="btn btn-sm btn-secondary">&times;</button>
+        </div>
+        <div class="panel-content">
+            <button class="panel-btn" id="panelMyAvailability">📅 My Availability</button>
+            <button class="panel-btn" id="panelHistory">📜 My History</button>
+            <button class="panel-btn" id="panelRules">📋 Rules</button>
+            <button class="panel-btn" id="panelAdmin" style="display:none;">👑 Admin Panel</button>
+            <hr>
+            <button class="panel-btn" id="panelLogout">🚪 Logout</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
         <nav class="navbar">
+            <button id="menuToggle" class="btn btn-secondary btn-sm">☰ Menu</button>
             <div class="nav-brand">🏸 Badminton Booking</div>
             <div class="nav-user">
                 <span id="userName">Welcome, User</span>
-                <button id="adminBtn" class="btn btn-warning btn-sm" style="display:none;">👑 Admin Panel</button>
-                <button id="logoutBtn" class="btn btn-secondary btn-sm">Logout</button>
+                <button id="logoutBtn" class="btn btn-secondary btn-sm" style="display:none;">Logout</button>
             </div>
         </nav>
 
         <div class="dashboard">
             <div class="dashboard-header">
                 <h2>📅 Weekly Availability</h2>
-                <p>Select the days you're available to play (7:00 AM - 8:00 AM)</p>
+                <div class="week-selector">
+                    <div id="weekDisplay" class="week-display">Selecting for: Loading...</div>
+                    <div class="week-buttons">
+                        <button id="thisWeekBtn" class="btn btn-secondary btn-sm">This Week</button>
+                        <button id="nextWeekBtn" class="btn btn-primary btn-sm">Next Week</button>
+                    </div>
+                </div>
+                <div id="selectionStatus" class="selection-status">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">Loading...</span>
+                </div>
                 <div id="deadlineWarning" class="warning-banner" style="display:none;">
-                    ⚠️ Selection deadline has passed. You can view but cannot change your selections.
+                    ⚠️ Selection window is closed. You can only view your selections.
                 </div>
                 <div id="adminControls" style="display: none;">
                     <p class="admin-badge">👑 Admin Controls</p>
@@ -45,10 +72,11 @@
                 <div class="info-card">
                     <h3>📊 How it Works</h3>
                     <ul>
+                        <li>Selection opens every Monday (all day)</li>
+                        <li>Select your availability for the NEXT week</li>
                         <li>Click on a day to mark your availability</li>
                         <li>Click again to unmark</li>
                         <li>Admin randomly selects a player for each day</li>
-                        <li>Selected player will be highlighted</li>
                     </ul>
                 </div>
                 <div class="info-card" id="myAvailability">
@@ -79,8 +107,8 @@
         </div>
     </div>
 
-    <script src="/js/supabase-setup.js"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/booking.js"></script>
+    <script src="js/supabase-setup.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/booking.js"></script>
 </body>
 </html>

@@ -3,16 +3,13 @@
 console.log('📚 booking.js loaded');
 
 const ADMIN_CODE = 'admin123';
-
-// Selection Window: ALL DAY Monday (12:00 AM - 11:59 PM)
 const SELECTION_WINDOW_DAY = 1; // 1 = Monday
 
-// Get the next week's dates (Monday-Sunday)
+// Get next week's dates
 function getNextWeekDates() {
     const today = new Date();
-    const currentDay = today.getDay(); // 0=Sunday, 1=Monday
+    const currentDay = today.getDay();
     
-    // Calculate next Monday
     let daysUntilNextMonday;
     if (currentDay === 0) {
         daysUntilNextMonday = 1;
@@ -44,12 +41,10 @@ function getNextWeekDates() {
     return weekDates;
 }
 
-// Get this week's dates (Monday-Sunday)
 function getThisWeekDates() {
     const today = new Date();
     const currentDay = today.getDay();
     
-    // Calculate this Monday
     const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
     const thisMonday = new Date(today);
     thisMonday.setDate(today.getDate() - daysToMonday);
@@ -73,26 +68,18 @@ function getThisWeekDates() {
     return weekDates;
 }
 
-// Check if selection window is open (ALL DAY Monday)
 function isSelectionWindowOpen() {
     const now = new Date();
-    const day = now.getDay(); // 0=Sunday, 1=Monday
-    
-    // Must be Monday (day === 1)
-    if (day !== 1) return false;
-    
-    // ALL DAY Monday is open!
-    return true;
+    const day = now.getDay();
+    return day === 1; // Monday
 }
 
-// Get the time remaining in the selection window
 function getTimeRemaining() {
     const now = new Date();
     const day = now.getDay();
     
     if (day !== 1) return 'Window closed';
     
-    // Calculate time until 11:59 PM Monday
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
     
@@ -107,17 +94,11 @@ function canEdit() {
     return isSelectionWindowOpen();
 }
 
-function canView() {
-    return true; // Always can view
-}
-
-// Show status message about selection window
 function getSelectionStatus() {
     const now = new Date();
     const day = now.getDay();
     
     if (day !== 1) {
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const nextMonday = new Date(now);
         const daysUntilMonday = day === 0 ? 1 : 8 - day;
         nextMonday.setDate(now.getDate() + daysUntilMonday);
@@ -154,7 +135,6 @@ async function getAvailability(weekType = 'next') {
         return data;
     } catch (error) {
         console.error('Error fetching availability:', error);
-        window.showToast('Failed to load availability', 'error');
         return [];
     }
 }
@@ -347,8 +327,6 @@ function renderDayCard(dayData, currentUser, isAdmin, canEditBool) {
     }
     
     const disabledMessage = !canEditBool ? '<div style="color:#888;font-size:0.7rem;">🔒 Locked</div>' : '';
-    
-    // Show day with date
     const displayName = dayData.date ? `${dayData.day} - ${dayData.date}` : dayData.day;
     
     card.innerHTML = `
@@ -372,8 +350,7 @@ function renderDayCard(dayData, currentUser, isAdmin, canEditBool) {
     return card;
 }
 
-// Current week view
-let currentWeekView = 'next'; // 'next' or 'this'
+let currentWeekView = 'next';
 
 function getWeekDates() {
     if (currentWeekView === 'next') {
@@ -422,30 +399,25 @@ async function renderDashboard() {
         // Show deadline warning
         const warningBanner = document.getElementById('deadlineWarning');
         if (warningBanner) {
-            if (!canEditBool) {
-                warningBanner.style.display = 'block';
-                warningBanner.textContent = '🔒 Selection is CLOSED. It opens every Monday (all day).';
-            } else {
-                warningBanner.style.display = 'none';
-            }
+            warningBanner.style.display = canEditBool ? 'none' : 'block';
         }
         
-        // Show admin button
-        const adminBtn = document.getElementById('adminBtn');
-        if (adminBtn) {
-            adminBtn.style.display = isAdmin ? 'inline-block' : 'none';
-        }
-        
+        // Show admin controls
         const adminControls = document.getElementById('adminControls');
         if (adminControls) {
             adminControls.style.display = isAdmin ? 'block' : 'none';
+        }
+        
+        // Show admin button in side panel
+        const panelAdmin = document.getElementById('panelAdmin');
+        if (panelAdmin) {
+            panelAdmin.style.display = isAdmin ? 'block' : 'none';
         }
         
         // Get bookings
         const bookings = await getAvailability(currentWeekView);
         const weekDates = getWeekDates();
         
-        // Combine bookings with dates
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const sortedBookings = [];
         
@@ -532,7 +504,6 @@ async function updateMyAvailability() {
     }
 }
 
-// Event handlers
 async function handleToggleAvailability(day, date) {
     const result = await toggleAvailability(day, date);
     if (result) await renderDashboard();
@@ -606,17 +577,21 @@ async function loadAllUsersAvailability() {
 
 // Side Panel Functions
 function openSidePanel() {
-    document.getElementById('sidePanel').classList.add('open');
-    document.querySelector('.main-content').classList.add('shifted');
+    const panel = document.getElementById('sidePanel');
+    const main = document.getElementById('mainContent');
+    if (panel) panel.classList.add('open');
+    if (main) main.classList.add('shifted');
 }
 
 function closeSidePanel() {
-    document.getElementById('sidePanel').classList.remove('open');
-    document.querySelector('.main-content').classList.remove('shifted');
+    const panel = document.getElementById('sidePanel');
+    const main = document.getElementById('mainContent');
+    if (panel) panel.classList.remove('open');
+    if (main) main.classList.remove('shifted');
 }
 
 // Initialize dashboard
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     if (window.location.pathname.includes('dashboard.html')) {
         const user = window.getCurrentUser();
         if (!user) {
@@ -627,66 +602,110 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('📊 Dashboard page loaded');
         console.log('👤 User:', user);
         
-        // Check if admin
-        window.checkAdmin().then(isAdmin => {
-            if (isAdmin) {
-                document.getElementById('panelAdmin').style.display = 'block';
-            }
-        });
+        // Set username
+        const userName = document.getElementById('userName');
+        if (userName) {
+            // Try to get username from profile
+            window.supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', user.id)
+                .single()
+                .then(({ data }) => {
+                    if (data) {
+                        userName.textContent = `👋 Welcome, ${data.username}`;
+                    }
+                });
+        }
         
         renderDashboard();
         setInterval(renderDashboard, 30000);
         
         // Menu button
-        document.getElementById('menuToggle').addEventListener('click', openSidePanel);
-        document.getElementById('closePanel').addEventListener('click', closeSidePanel);
+        const menuToggle = document.getElementById('menuToggle');
+        if (menuToggle) {
+            menuToggle.addEventListener('click', openSidePanel);
+        }
+        
+        const closePanel = document.getElementById('closePanel');
+        if (closePanel) {
+            closePanel.addEventListener('click', closeSidePanel);
+        }
         
         // Week buttons
-        document.getElementById('thisWeekBtn').addEventListener('click', () => {
-            currentWeekView = 'this';
-            document.getElementById('thisWeekBtn').className = 'btn btn-primary btn-sm';
-            document.getElementById('nextWeekBtn').className = 'btn btn-secondary btn-sm';
-            renderDashboard();
-        });
+        const thisWeekBtn = document.getElementById('thisWeekBtn');
+        const nextWeekBtn = document.getElementById('nextWeekBtn');
         
-        document.getElementById('nextWeekBtn').addEventListener('click', () => {
-            currentWeekView = 'next';
-            document.getElementById('nextWeekBtn').className = 'btn btn-primary btn-sm';
-            document.getElementById('thisWeekBtn').className = 'btn btn-secondary btn-sm';
-            renderDashboard();
-        });
+        if (thisWeekBtn) {
+            thisWeekBtn.addEventListener('click', function() {
+                currentWeekView = 'this';
+                this.className = 'btn btn-primary btn-sm';
+                if (nextWeekBtn) nextWeekBtn.className = 'btn btn-secondary btn-sm';
+                renderDashboard();
+            });
+        }
         
-        // Admin button
-        document.getElementById('panelAdmin').addEventListener('click', openAdminPanel);
+        if (nextWeekBtn) {
+            nextWeekBtn.addEventListener('click', function() {
+                currentWeekView = 'next';
+                this.className = 'btn btn-primary btn-sm';
+                if (thisWeekBtn) thisWeekBtn.className = 'btn btn-secondary btn-sm';
+                renderDashboard();
+            });
+        }
         
-        // Modal close
-        document.getElementById('closeModal').addEventListener('click', () => {
-            document.getElementById('adminModal').style.display = 'none';
-        });
+        // Panel buttons
+        const panelMyAvailability = document.getElementById('panelMyAvailability');
+        if (panelMyAvailability) {
+            panelMyAvailability.addEventListener('click', function() {
+                closeSidePanel();
+                const section = document.getElementById('myAvailability');
+                if (section) section.scrollIntoView({ behavior: 'smooth' });
+            });
+        }
         
-        window.addEventListener('click', (e) => {
+        const panelAdmin = document.getElementById('panelAdmin');
+        if (panelAdmin) {
+            panelAdmin.addEventListener('click', openAdminPanel);
+        }
+        
+        const panelRules = document.getElementById('panelRules');
+        if (panelRules) {
+            panelRules.addEventListener('click', function() {
+                alert('📋 Rules page coming soon!');
+            });
+        }
+        
+        const panelLogout = document.getElementById('panelLogout');
+        if (panelLogout) {
+            panelLogout.addEventListener('click', function() {
+                window.logoutUser();
+            });
+        }
+        
+        // Admin modal
+        const closeModal = document.getElementById('closeModal');
+        if (closeModal) {
+            closeModal.addEventListener('click', function() {
+                document.getElementById('adminModal').style.display = 'none';
+            });
+        }
+        
+        window.addEventListener('click', function(e) {
             const modal = document.getElementById('adminModal');
             if (e.target === modal) modal.style.display = 'none';
         });
         
-        document.getElementById('verifyAdminBtn').addEventListener('click', verifyAdmin);
+        const verifyBtn = document.getElementById('verifyAdminBtn');
+        if (verifyBtn) {
+            verifyBtn.addEventListener('click', verifyAdmin);
+        }
         
-        document.getElementById('adminCode').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') verifyAdmin();
-        });
-        
-        // Panel buttons
-        document.getElementById('panelMyAvailability').addEventListener('click', () => {
-            closeSidePanel();
-            document.getElementById('myAvailability').scrollIntoView({ behavior: 'smooth' });
-        });
-        
-        document.getElementById('panelRules').addEventListener('click', () => {
-            alert('📋 Rules page coming soon!');
-        });
-        
-        document.getElementById('panelLogout').addEventListener('click', () => {
-            window.logoutUser();
-        });
+        const adminCodeInput = document.getElementById('adminCode');
+        if (adminCodeInput) {
+            adminCodeInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') verifyAdmin();
+            });
+        }
     }
 });
