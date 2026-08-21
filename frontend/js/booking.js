@@ -1,4 +1,4 @@
-// Booking functions
+// Booking functions - Replacement with all users
 
 console.log('📚 booking.js loaded');
 
@@ -57,20 +57,18 @@ function isSelectionWindowOpen() {
     const now = new Date();
     let day = now.getDay();
     
-    // If Test Run is active, pretend it's Monday
     if (testRunMode) {
         console.log('🧪 Test Run: Forcing Monday');
         return true;
     }
     
-    return day === 1; // Normal: Only Monday
+    return day === 1;
 }
 
 function getSelectionStatus() {
     const now = new Date();
     const day = now.getDay();
     
-    // If Test Run is active
     if (testRunMode) {
         return {
             status: 'open',
@@ -126,7 +124,7 @@ const RULES_DATA = [
     {
         category: '🔄 Replacement Rules',
         rules: [
-            'You can find a replacement from the available players list',
+            'You can find a replacement from any registered user',
             'The replacement must be approved by the admin',
             'The replacement takes full responsibility for the booking',
             'If no replacement is found, you must pay the penalty'
@@ -461,7 +459,7 @@ async function getMyAvailability() {
     }
 }
 
-async function getAllUsersAvailability() {
+async function getAllUsers() {
     const token = window.getToken();
     if (!token) return [];
     try {
@@ -870,7 +868,7 @@ async function loadAllUsersAvailability() {
     if (!container) return;
     container.innerHTML = 'Loading...';
     try {
-        const users = await getAllUsersAvailability();
+        const users = await getAllUsers();
         if (!users || users.length === 0) {
             container.innerHTML = '<p>No users found.</p>';
             return;
@@ -893,6 +891,79 @@ async function loadAllUsersAvailability() {
     } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = '<p style="color: red;">Failed to load users.</p>';
+    }
+}
+
+// ============ REPLACEMENT WITH ALL USERS ============
+async function openReplacementModal(day) {
+    document.getElementById('replaceDay').textContent = day;
+    document.getElementById('replacementModal').style.display = 'flex';
+    const container = document.getElementById('replacementList');
+    container.innerHTML = 'Loading users...';
+    
+    try {
+        // Get ALL users from the system
+        const allUsers = await getAllUsers();
+        const currentUser = window.getCurrentUser();
+        
+        // Filter out the current user
+        const availableUsers = allUsers.filter(function(user) {
+            return user.id !== currentUser?.id;
+        });
+        
+        if (availableUsers.length === 0) {
+            container.innerHTML = '<p style="color: #888;">No other users found in the system.</p>';
+            return;
+        }
+        
+        let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users:</p>';
+        html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
+        html += '<option value="">-- Select a user --</option>';
+        
+        for (let i = 0; i < availableUsers.length; i++) {
+            const user = availableUsers[i];
+            const displayName = user.full_name || user.username;
+            html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
+        }
+        
+        html += '</select>';
+        html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
+        html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
+        
+        container.innerHTML = html;
+        
+        // Add event listener to the confirm button
+        const confirmBtn = document.getElementById('confirmReplacementBtn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', async function() {
+                const select = document.getElementById('replacementSelect');
+                const selectedUserId = select?.value;
+                const selectedUsername = select?.options[select.selectedIndex]?.text || '';
+                
+                if (!selectedUserId) {
+                    document.getElementById('replacementError').style.display = 'block';
+                    return;
+                }
+                
+                document.getElementById('replacementError').style.display = 'none';
+                
+                const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
+                if (confirmed) {
+                    const success = await addReplacement(currentUser.id, selectedUserId, day);
+                    if (success) {
+                        window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
+                        document.getElementById('replacementModal').style.display = 'none';
+                        await renderDashboard();
+                    } else {
+                        window.showToast('❌ Failed to add replacement. Please try again.', 'error');
+                    }
+                }
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error loading users for replacement:', error);
+        container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
     }
 }
 
@@ -924,57 +995,6 @@ async function handleOptOut(day, bookingId, action) {
         closeOptOutModal();
         openPenaltyModal(day, bookingId);
         return;
-    }
-}
-
-async function openReplacementModal(day) {
-    document.getElementById('replaceDay').textContent = day;
-    document.getElementById('replacementModal').style.display = 'flex';
-    const container = document.getElementById('replacementList');
-    container.innerHTML = 'Loading players...';
-    try {
-        const users = await getAvailableUsersForDay(day);
-        const currentUser = window.getCurrentUser();
-        const availableUsers = [];
-        for (let i = 0; i < users.length; i++) {
-            if (users[i].id !== currentUser?.id) {
-                availableUsers.push(users[i]);
-            }
-        }
-        if (availableUsers.length === 0) {
-            container.innerHTML = '<p style="color: #888;">No other players available for this day.</p>';
-            return;
-        }
-        let html = '';
-        for (let i = 0; i < availableUsers.length; i++) {
-            const user = availableUsers[i];
-            html += '<div class="replacement-item">' +
-                '<span class="username">👤 ' + user.username + '</span>' +
-                '<button class="btn btn-success btn-sm select-replacement" data-user-id="' + user.id + '" data-username="' + user.username + '">Select</button>' +
-                '</div>';
-        }
-        container.innerHTML = html;
-        const btns = container.querySelectorAll('.select-replacement');
-        for (let i = 0; i < btns.length; i++) {
-            btns[i].addEventListener('click', async function() {
-                const userId = this.dataset.userId;
-                const username = this.dataset.username;
-                const confirmed = confirm('Are you sure you want ' + username + ' to replace you for ' + day + '?');
-                if (confirmed) {
-                    const success = await addReplacement(currentUser.id, userId, day);
-                    if (success) {
-                        window.showToast('✅ ' + username + ' has been added as your replacement.', 'success');
-                        document.getElementById('replacementModal').style.display = 'none';
-                        await renderDashboard();
-                    } else {
-                        window.showToast('❌ Failed to add replacement. Please try again.', 'error');
-                    }
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error loading replacement users:', error);
-        container.innerHTML = '<p style="color: red;">Failed to load users.</p>';
     }
 }
 
@@ -1013,7 +1033,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('📊 Dashboard page loaded');
         console.log('👤 User:', user);
         
-        // Check Test Run status from localStorage
         if (localStorage.getItem('testRunMode') === 'true') {
             testRunMode = true;
         }
