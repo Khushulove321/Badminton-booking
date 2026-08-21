@@ -1,4 +1,4 @@
-// Booking functions - Replacement with all users
+// Booking functions - With Simulated Data for Both Weeks
 
 console.log('📚 booking.js loaded');
 
@@ -10,7 +10,38 @@ let currentView = 'dashboard';
 
 // ===== TEST RUN MODE =====
 let testRunMode = false;
-let testRunDay = 1; // Monday by default
+let testRunDay = 1;
+
+// Sample users for simulation
+const SAMPLE_USERS = [
+    { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
+    { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
+    { id: 'user3', username: 'bob_wilson', full_name: 'Bob Wilson' },
+    { id: 'user4', username: 'alice_brown', full_name: 'Alice Brown' },
+    { id: 'user5', username: 'charlie_davis', full_name: 'Charlie Davis' },
+    { id: 'user6', username: 'emma_jones', full_name: 'Emma Jones' },
+    { id: 'user7', username: 'mike_miller', full_name: 'Mike Miller' },
+];
+
+function getSimulatedThisWeekBookers() {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    // Randomly assign users to days for this week
+    const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
+    return dayOrder.map((day, index) => ({
+        day: day,
+        selected_user: shuffled[index % shuffled.length]
+    }));
+}
+
+function getSimulatedNextWeekBookers() {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    // Different random assignment for next week
+    const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
+    return dayOrder.map((day, index) => ({
+        day: day,
+        selected_user: shuffled[(index + 3) % shuffled.length]
+    }));
+}
 
 function toggleTestRun() {
     const wasActive = testRunMode;
@@ -22,43 +53,93 @@ function toggleTestRun() {
         document.getElementById('testRunBtn').textContent = '🧪 Test Run';
         document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
         window.showToast('🔴 Test Run disabled', 'info');
+        if (document.getElementById('testRunType')) {
+            document.getElementById('testRunType').textContent = '';
+        }
+        // Clear simulated data flag
+        localStorage.removeItem('simulateSunday');
     } else {
         testRunMode = true;
         localStorage.setItem('testRunMode', 'true');
-        document.getElementById('testRunStatus').textContent = '🧪 TEST RUN ACTIVE - Simulating Monday';
+        document.getElementById('testRunStatus').textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
         document.getElementById('testRunStatus').style.color = '#f59e0b';
         document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
         document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
         window.showToast('🧪 Test Run activated - Simulating Monday!', 'success');
+        // Clear simulated data flag
+        localStorage.removeItem('simulateSunday');
     }
     renderDashboard();
 }
 
-// Check if Test Run is active on page load
+function simulateSunday() {
+    // Enable test run and Sunday mode
+    testRunMode = true;
+    localStorage.setItem('testRunMode', 'true');
+    localStorage.setItem('simulateSunday', 'true');
+    
+    document.getElementById('testRunStatus').textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
+    document.getElementById('testRunStatus').style.color = '#f56565';
+    document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
+    document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
+    if (document.getElementById('testRunType')) {
+        document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers';
+        document.getElementById('testRunType').style.color = '#f56565';
+    }
+    window.showToast('🧪 Sunday Simulation activated - Showing simulated court bookers!', 'success');
+    renderDashboard();
+}
+
+function disableSimulation() {
+    testRunMode = false;
+    localStorage.removeItem('testRunMode');
+    localStorage.removeItem('simulateSunday');
+    document.getElementById('testRunStatus').textContent = '';
+    document.getElementById('testRunStatus').style.color = '#666';
+    document.getElementById('testRunBtn').textContent = '🧪 Test Run';
+    document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
+    if (document.getElementById('testRunType')) {
+        document.getElementById('testRunType').textContent = '';
+    }
+    renderDashboard();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     if (localStorage.getItem('testRunMode') === 'true') {
         testRunMode = true;
-        testRunDay = 1; // Monday
+        testRunDay = 1;
         const statusEl = document.getElementById('testRunStatus');
         const btn = document.getElementById('testRunBtn');
+        const isSunday = localStorage.getItem('simulateSunday') === 'true';
         if (statusEl) {
-            statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday';
-            statusEl.style.color = '#f59e0b';
+            if (isSunday) {
+                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
+                statusEl.style.color = '#f56565';
+            } else {
+                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
+                statusEl.style.color = '#f59e0b';
+            }
         }
         if (btn) {
             btn.textContent = '🔴 Disable Test Run';
             btn.className = 'btn btn-danger btn-sm';
         }
+        if (isSunday && document.getElementById('testRunType')) {
+            document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers';
+            document.getElementById('testRunType').style.color = '#f56565';
+        }
     }
 });
 
-// Override the date check functions
 function isSelectionWindowOpen() {
     const now = new Date();
     let day = now.getDay();
     
     if (testRunMode) {
-        console.log('🧪 Test Run: Forcing Monday');
+        const isSunday = localStorage.getItem('simulateSunday') === 'true';
+        if (isSunday) {
+            return false;
+        }
         return true;
     }
     
@@ -68,6 +149,15 @@ function isSelectionWindowOpen() {
 function getSelectionStatus() {
     const now = new Date();
     const day = now.getDay();
+    const isSunday = localStorage.getItem('simulateSunday') === 'true';
+    
+    if (testRunMode && isSunday) {
+        return {
+            status: 'sunday',
+            message: '🧪 TEST RUN: Simulating Sunday - FINAL COURT BOOKERS',
+            className: 'sunday'
+        };
+    }
     
     if (testRunMode) {
         return {
@@ -395,6 +485,26 @@ function getNextWeekDates() {
     return weekDates;
 }
 
+function getThisWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysToMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(thisMonday);
+        date.setDate(thisMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
+}
+
 function canEdit() {
     return isSelectionWindowOpen();
 }
@@ -474,7 +584,22 @@ async function getAllUsers() {
     }
 }
 
-async function getSelectedPlayers() {
+async function getThisWeekBookers() {
+    const token = window.getToken();
+    if (!token) return [];
+    try {
+        const response = await fetch(window.API_URL + '/booking/this-week-bookers', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!response.ok) throw new Error('Failed to fetch this week bookers');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching this week bookers:', error);
+        return [];
+    }
+}
+
+async function getNextWeekSelected() {
     const token = window.getToken();
     if (!token) return [];
     try {
@@ -658,31 +783,91 @@ function renderMyAvailability(myAvailability, isBookedDays) {
     }
 }
 
-function renderSelectedPlayersTable(selected) {
+// ============ TWO WEEK TABLE WITH SIMULATED DATA ============
+async function renderTwoWeekTable() {
     const tbody = document.getElementById('selectedPlayersBody');
     if (!tbody) return;
     
-    if (!selected || selected.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#888;">No players selected yet for next week.</td></tr>';
-        return;
+    const isSunday = localStorage.getItem('simulateSunday') === 'true';
+    const isTestRun = localStorage.getItem('testRunMode') === 'true';
+    
+    const thisWeekDates = getThisWeekDates();
+    const nextWeekDates = getNextWeekDates();
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    // Show Sunday indicator if active
+    if (isSunday && isTestRun) {
+        document.getElementById('sundayIndicator').style.display = 'inline';
+    } else {
+        document.getElementById('sundayIndicator').style.display = 'none';
     }
     
-    const weekDates = getNextWeekDates();
+    // Get real data (or empty)
+    let thisWeekBookers = [];
+    let nextWeekSelected = [];
     
+    try {
+        thisWeekBookers = await getThisWeekBookers();
+    } catch (e) { console.error('Error fetching this week bookers:', e); }
+    
+    try {
+        nextWeekSelected = await getNextWeekSelected();
+    } catch (e) { console.error('Error fetching next week selected:', e); }
+    
+    // If in Sunday simulation mode and no real data, generate simulated data
+    if (isSunday && isTestRun) {
+        // Generate simulated data for both weeks
+        const simulatedThisWeek = getSimulatedThisWeekBookers();
+        const simulatedNextWeek = getSimulatedNextWeekBookers();
+        thisWeekBookers = simulatedThisWeek;
+        nextWeekSelected = simulatedNextWeek;
+    }
+    
+    // Build the table
     let html = '';
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    let hasData = false;
     
     for (let i = 0; i < dayOrder.length; i++) {
         const day = dayOrder[i];
-        const selectedItem = selected.find(function(item) { return item.day === day; });
-        const dateObj = weekDates.find(function(d) { return d.day === day; });
-        const dateStr = dateObj ? ' (' + dateObj.dateString + ')' : '';
+        
+        // This week data
+        const thisWeekDateObj = thisWeekDates.find(function(d) { return d.day === day; });
+        const thisWeekDateStr = thisWeekDateObj ? thisWeekDateObj.dateString : 'TBD';
+        const thisWeekBooker = thisWeekBookers.find(function(b) { return b.day === day; });
+        let thisWeekDisplay = '❌ No booker';
+        if (thisWeekBooker && thisWeekBooker.selected_user) {
+            hasData = true;
+            const user = thisWeekBooker.selected_user;
+            thisWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
+        }
+        
+        // Next week data
+        const nextWeekDateObj = nextWeekDates.find(function(d) { return d.day === day; });
+        const nextWeekDateStr = nextWeekDateObj ? nextWeekDateObj.dateString : 'TBD';
+        const nextWeekBooker = nextWeekSelected.find(function(b) { return b.day === day; });
+        let nextWeekDisplay = '❌ No booker';
+        if (nextWeekBooker && nextWeekBooker.selected_user) {
+            hasData = true;
+            const user = nextWeekBooker.selected_user;
+            nextWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
+        }
         
         html += '<tr>';
-        html += '<td><strong>' + day + '</strong>' + dateStr + '</td>';
-        html += '<td>' + (selectedItem && selectedItem.selected_user ? '👤 ' + selectedItem.selected_user.username : '❌ Not selected') + '</td>';
+        html += '<td><strong>' + day + '</strong><br><span style="font-size:0.8rem;color:#888;">' + thisWeekDateStr + '</span></td>';
+        html += '<td>' + thisWeekDisplay + '</td>';
+        html += '<td>' + nextWeekDisplay + '</td>';
         html += '</tr>';
     }
+    
+    if (!hasData) {
+        // No data at all - show message
+        if (isSunday && isTestRun) {
+            html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first or check back later.</td></tr>';
+        } else {
+            html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">No bookings found. Click "Simulate Sunday" to see a preview.</td></tr>';
+        }
+    }
+    
     tbody.innerHTML = html;
 }
 
@@ -800,8 +985,7 @@ async function renderDashboard() {
         }
         const myAvailability = await getMyAvailability();
         renderMyAvailability(myAvailability, bookedDays);
-        const selected = await getSelectedPlayers();
-        renderSelectedPlayersTable(selected);
+        await renderTwoWeekTable();
         await checkNotifications();
     } catch (error) {
         console.error('Error rendering dashboard:', error);
@@ -902,11 +1086,8 @@ async function openReplacementModal(day) {
     container.innerHTML = 'Loading users...';
     
     try {
-        // Get ALL users from the system
         const allUsers = await getAllUsers();
         const currentUser = window.getCurrentUser();
-        
-        // Filter out the current user
         const availableUsers = allUsers.filter(function(user) {
             return user.id !== currentUser?.id;
         });
@@ -932,7 +1113,6 @@ async function openReplacementModal(day) {
         
         container.innerHTML = html;
         
-        // Add event listener to the confirm button
         const confirmBtn = document.getElementById('confirmReplacementBtn');
         if (confirmBtn) {
             confirmBtn.addEventListener('click', async function() {
@@ -1168,11 +1348,18 @@ document.addEventListener('DOMContentLoaded', function() {
             window.logoutUser();
         });
         
-        // TEST RUN BUTTON
+        // TEST RUN BUTTONS
         const testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
                 toggleTestRun();
+            });
+        }
+        
+        const sundayBtn = document.getElementById('sundaySimBtn');
+        if (sundayBtn) {
+            sundayBtn.addEventListener('click', function() {
+                simulateSunday();
             });
         }
     }
