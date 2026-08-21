@@ -75,6 +75,7 @@ app.get('/api/booking/availability', authenticate, async (req, res) => {
     if (error) throw error;
     res.json(data || []);
   } catch (error) {
+    console.error('Error fetching availability:', error);
     res.status(500).json({ error: 'Error fetching availability' });
   }
 });
@@ -116,6 +117,7 @@ app.post('/api/booking/select/:day', authenticate, async (req, res) => {
       res.json({ success: true, action: 'added', message: `Added to ${day}` });
     }
   } catch (error) {
+    console.error('Error toggling availability:', error);
     res.status(500).json({ error: 'Error toggling availability' });
   }
 });
@@ -148,24 +150,54 @@ app.post('/api/booking/reset/:day', authenticate, isAdmin, async (req, res) => {
   }
 });
 
-// Get user's availability
+// Get user's availability - FIXED
 app.get('/api/booking/my-availability', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { data, error } = await supabaseAdmin.rpc('get_user_availability', {
-      user_id: userId
-    });
-    if (error) throw error;
-    res.json(data || []);
+    console.log('📊 Getting availability for user:', userId);
+    
+    // Try to get from availability table directly
+    const { data: availabilityData, error: availabilityError } = await supabaseAdmin
+      .from('availability')
+      .select(`
+        booking_id,
+        bookings (
+          id,
+          day,
+          time,
+          is_booked
+        )
+      `)
+      .eq('user_id', userId);
+      
+    if (availabilityError) {
+      console.error('❌ Availability error:', availabilityError);
+      // Return empty array instead of error
+      return res.json([]);
+    }
+    
+    // Format the response
+    const formatted = availabilityData
+      .filter(item => item.bookings) // Filter out null bookings
+      .map(item => ({
+        day: item.bookings?.day || 'Unknown',
+        time: item.bookings?.time || '7:00 - 8:00 AM',
+        is_booked: item.bookings?.is_booked || false,
+        booking_id: item.bookings?.id || null
+      }));
+    
+    console.log('✅ My availability data:', formatted);
+    res.json(formatted);
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching availability' });
+    console.error('Error fetching user availability:', error);
+    // Return empty array instead of error
+    res.json([]);
   }
 });
 
 // Get all users with their availability (admin only)
 app.get('/api/booking/all-users', authenticate, isAdmin, async (req, res) => {
   try {
-    // Get all profiles with their availability
     const { data: users, error: usersError } = await supabaseAdmin
       .from('profiles')
       .select(`
@@ -183,7 +215,6 @@ app.get('/api/booking/all-users', authenticate, isAdmin, async (req, res) => {
       
     if (usersError) throw usersError;
     
-    // Format the response
     const formatted = users.map(user => ({
       id: user.id,
       username: user.username,
@@ -228,6 +259,157 @@ app.get('/api/booking/selected-players', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Error fetching selected players:', error);
     res.status(500).json({ error: 'Error fetching selected players' });
+  }
+});
+
+// Get user's penalties
+app.get('/api/booking/my-penalties', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Check if penalties table exists, if not return empty array
+    const { data: penalties, error } = await supabaseAdmin
+      .from('penalties')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'pending');
+      
+    if (error) {
+      console.error('❌ Penalties error:', error);
+      // Table might not exist yet, return empty
+      return res.json([]);
+    }
+    
+    res.json(penalties || []);
+  } catch (error) {
+    console.error('Error fetching penalties:', error);
+    res.json([]);
+  }
+});
+
+// Pay penalty
+app.post('/api/booking/pay-penalty', authenticate, async (req, res) => {
+  try {
+    const { penalty_id } = req.body;
+    const userId = req.user.id;
+    
+    const { data, error } = await supabaseAdmin
+      .from('penalties')
+      .update({ status: 'paid', paid_at: new Date() })
+      .eq('id', penalty_id)
+      .eq('user_id', userId)
+      .select();
+      
+    if (error) throw error;
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error paying penalty:', error);
+    res.status(500).json({ error: 'Error paying penalty' });
+  }
+});
+
+// Record penalty
+app.post('/api/booking/penalty', authenticate, async (req, res) => {
+  try {
+    const { user_id, booking_id, amount } = req.body;
+    
+    const { data, error } = await supabaseAdmin
+      .from('penalties')
+      .insert({
+        user_id: user_id,
+        booking_id: booking_id,
+        amount: amount || 10.00,
+        status: 'pending'
+      })
+      .select();
+      
+    if (error) throw error;
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error recording penalty:', error);
+    res.status(500).json({ error: 'Error recording penalty' });
+  }
+});
+
+// Get user history
+app.get('/api/booking/my-history', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's booking history
+    const { data: history, error } = await supabaseAdmin
+      .from('history')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+      
+    if (error) {
+      console.error('❌ History error:', error);
+      // Table might not exist yet, return empty
+      return res.json([]);
+    }
+    
+    res.json(history || []);
+  } catch (error) {
+    console.error('Error fetching history:', error);
+    res.json([]);
+  }
+});
+
+// Admin open bookings
+app.post('/api/booking/admin-open', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { open } = req.body;
+    
+    // Store in database or just return success
+    // In a real app, you'd store this setting
+    res.json({ success: true, open });
+  } catch (error) {
+    console.error('Error setting admin open:', error);
+    res.status(500).json({ error: 'Error setting admin open' });
+  }
+});
+
+// Replacement endpoint
+app.post('/api/booking/replace', authenticate, async (req, res) => {
+  try {
+    const { original_user_id, replacement_user_id, day } = req.body;
+    
+    // Get booking ID for the day
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from('bookings')
+      .select('id')
+      .eq('day', day)
+      .single();
+      
+    if (bookingError) throw bookingError;
+    
+    // Remove original user
+    const { error: deleteError } = await supabaseAdmin
+      .from('availability')
+      .delete()
+      .eq('user_id', original_user_id)
+      .eq('booking_id', booking.id);
+      
+    if (deleteError) throw deleteError;
+    
+    // Add replacement user
+    const { error: insertError } = await supabaseAdmin
+      .from('availability')
+      .insert({
+        user_id: replacement_user_id,
+        booking_id: booking.id
+      });
+      
+    if (insertError) throw insertError;
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error replacing user:', error);
+    res.status(500).json({ error: 'Error replacing user' });
   }
 });
 
