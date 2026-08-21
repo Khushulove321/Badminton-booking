@@ -1,4 +1,4 @@
-// Booking functions - With History Recording
+// Booking functions - With Notifications
 
 console.log('📚 booking.js loaded');
 
@@ -14,6 +14,164 @@ function isAdminUser(user) {
   if (user.email === 'admin@gmail.com') return true;
   if (user.username === 'admin') return true;
   return false;
+}
+
+// ===== NOTIFICATION FUNCTIONS =====
+async function createNotification(userId, title, message, type = 'info', relatedId = null) {
+  const token = window.getToken();
+  if (!token) return false;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/create-notification`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        title: title,
+        message: message,
+        type: type,
+        related_id: relatedId
+      })
+    });
+    
+    if (!response.ok) throw new Error('Failed to create notification');
+    console.log('✅ Notification created for user:', userId);
+    return true;
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    return false;
+  }
+}
+
+async function getUnreadCount() {
+  const token = window.getToken();
+  if (!token) return 0;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/unread-count`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to get unread count');
+    const data = await response.json();
+    return data.count || 0;
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    return 0;
+  }
+}
+
+async function loadNotifications() {
+  const container = document.getElementById('notificationsList');
+  if (!container) return;
+  
+  const token = window.getToken();
+  if (!token) {
+    container.innerHTML = '<p style="color: #888;">Please login to view notifications.</p>';
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/my-notifications`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch notifications');
+    
+    const notifications = await response.json();
+    
+    if (!notifications || notifications.length === 0) {
+      container.innerHTML = '<p style="color: #888;">🎉 No notifications.</p>';
+      return;
+    }
+    
+    let html = '<h3>🔔 Your Notifications</h3>';
+    
+    for (let i = 0; i < notifications.length; i++) {
+      const n = notifications[i];
+      const isRead = n.is_read ? 'read' : 'unread';
+      const typeColor = n.type === 'penalty' ? '#fc8181' : 
+                        n.type === 'replacement' ? '#ed8936' : 
+                        n.type === 'warning' ? '#f6e05e' : '#667eea';
+      
+      html += `
+        <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor};">
+          <div class="notification-icon">${n.type === 'penalty' ? '💰' : n.type === 'replacement' ? '🔄' : n.type === 'warning' ? '⚠️' : 'ℹ️'}</div>
+          <div class="notification-content">
+            <div class="notification-title">${n.title}</div>
+            <div class="notification-details">${n.message}</div>
+            <div class="notification-date">${new Date(n.created_at).toLocaleString()}</div>
+            ${!isRead ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${n.id}">Mark as Read</button>` : ''}
+          </div>
+        </div>
+      `;
+    }
+    
+    container.innerHTML = html;
+    
+    // Mark as read buttons
+    const markBtns = container.querySelectorAll('.mark-read-btn');
+    for (let i = 0; i < markBtns.length; i++) {
+      markBtns[i].addEventListener('click', async function() {
+        const id = this.dataset.id;
+        await markNotificationRead(id);
+      });
+    }
+    
+    // Update badge
+    const unreadCount = notifications.filter(n => !n.is_read).length;
+    updateNotificationBadge(unreadCount);
+    
+  } catch (error) {
+    console.error('Error loading notifications:', error);
+    container.innerHTML = '<p style="color: red;">Failed to load notifications.</p>';
+  }
+}
+
+async function markNotificationRead(notificationId) {
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/notification-read`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ notification_id: notificationId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to mark as read');
+    
+    await loadNotifications();
+    await updateNotificationBadge();
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+  }
+}
+
+async function updateNotificationBadge(count) {
+  const badge = document.getElementById('notificationBadge');
+  if (!badge) return;
+  
+  if (count === undefined) {
+    count = await getUnreadCount();
+  }
+  
+  if (count > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = count;
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // ===== HISTORY RECORDING FUNCTION =====
@@ -310,7 +468,9 @@ function switchView(view) {
     document.getElementById('historyView').style.display = view === 'history' ? 'block' : 'none';
     
     if (view === 'rules') renderRulesPage();
-    if (view === 'notifications') renderNotificationsPage();
+    if (view === 'notifications') {
+        loadNotifications();
+    }
     if (view === 'history') {
         if (typeof initHistoryPage === 'function') {
             initHistoryPage();
@@ -411,95 +571,7 @@ async function renderHistoryPage() {
 }
 
 // ============ NOTIFICATIONS PAGE ============
-async function renderNotificationsPage() {
-    const container = document.getElementById('notificationsList');
-    if (!container) return;
-    container.innerHTML = 'Loading notifications...';
-    try {
-        const user = window.getCurrentUser();
-        if (!user) {
-            container.innerHTML = '<p style="color: #888;">Please login to view notifications.</p>';
-            return;
-        }
-        const token = window.getToken();
-        const response = await fetch(window.API_URL + '/booking/my-penalties', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (!response.ok) {
-            container.innerHTML = '<p style="color: #888;">No notifications.</p>';
-            return;
-        }
-        const penalties = await response.json();
-        if (!penalties || penalties.length === 0) {
-            container.innerHTML = '<p style="color: #888;">🎉 No notifications! You have no pending penalties.</p>';
-            const badge = document.getElementById('notificationBadge');
-            if (badge) badge.style.display = 'none';
-            return;
-        }
-        const badge = document.getElementById('notificationBadge');
-        if (badge) {
-            badge.style.display = 'inline-block';
-            badge.textContent = penalties.length;
-        }
-        let html = '<h3>💰 Pending Penalties</h3>';
-        html += '<p style="color: #666;margin-bottom:20px;">You have ' + penalties.length + ' penalty(ies) that need to be paid.</p>';
-        for (let i = 0; i < penalties.length; i++) {
-            const p = penalties[i];
-            html += '<div class="notification-item">';
-            html += '<div class="notification-icon">💰</div>';
-            html += '<div class="notification-content">';
-            html += '<div class="notification-title">Penalty for ' + (p.day || 'Unknown day') + '</div>';
-            html += '<div class="notification-details">Amount: $' + (p.amount || '10.00') + ' | Status: ' + (p.status || 'pending') + '</div>';
-            html += '<div class="notification-date">' + new Date(p.created_at).toLocaleDateString() + '</div>';
-            html += '<button class="btn btn-danger btn-sm pay-penalty-btn" data-id="' + p.id + '">Pay Now</button>';
-            html += '</div>';
-            html += '</div>';
-        }
-        container.innerHTML = html;
-        const payBtns = container.querySelectorAll('.pay-penalty-btn');
-        for (let i = 0; i < payBtns.length; i++) {
-            payBtns[i].addEventListener('click', function() {
-                const id = this.dataset.id;
-                if (confirm('Are you sure you want to pay this penalty?')) {
-                    payPenalty(id);
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error loading notifications:', error);
-        container.innerHTML = '<p style="color: red;">Failed to load notifications.</p>';
-    }
-}
-
-async function payPenalty(penaltyId) {
-    const token = window.getToken();
-    if (!token) return;
-    try {
-        const response = await fetch(window.API_URL + '/booking/pay-penalty', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ penalty_id: penaltyId })
-        });
-        if (!response.ok) throw new Error('Failed to pay penalty');
-        window.showToast('✅ Penalty paid successfully!', 'success');
-        await renderNotificationsPage();
-        const badge = document.getElementById('notificationBadge');
-        if (badge) {
-            const current = parseInt(badge.textContent) || 0;
-            if (current <= 1) {
-                badge.style.display = 'none';
-            } else {
-                badge.textContent = current - 1;
-            }
-        }
-    } catch (error) {
-        console.error('Error paying penalty:', error);
-        window.showToast('❌ Failed to pay penalty.', 'error');
-    }
-}
+// (Now handled by loadNotifications function above)
 
 // ============ DASHBOARD FUNCTIONS ============
 function getNextWeekDates() {
@@ -1037,6 +1109,7 @@ async function renderDashboard() {
         renderMyAvailability(myAvailability, bookedDays);
         await renderTwoWeekTable(isAdmin);
         await checkNotifications();
+        await updateNotificationBadge();
     } catch (error) {
         console.error('Error rendering dashboard:', error);
         daysGrid.innerHTML = '<div class="error-message">Failed to load availability. Please refresh.</div>';
@@ -1126,7 +1199,7 @@ async function selectRandomUser(day) {
   }
 }
 
-// ============ REPLACEMENT WITH ADMIN EXCLUSION ============
+// ============ REPLACEMENT WITH NOTIFICATIONS ============
 async function openReplacementModal(day) {
   document.getElementById('replaceDay').textContent = day;
   document.getElementById('replacementModal').style.display = 'flex';
@@ -1170,6 +1243,7 @@ async function openReplacementModal(day) {
         const select = document.getElementById('replacementSelect');
         const selectedUserId = select?.value;
         const selectedUsername = select?.options[select.selectedIndex]?.text || '';
+        const selectedFullName = select?.options[select.selectedIndex]?.text || selectedUsername;
         
         if (!selectedUserId) {
           document.getElementById('replacementError').style.display = 'block';
@@ -1183,17 +1257,38 @@ async function openReplacementModal(day) {
           const success = await addReplacement(currentUser.id, selectedUserId, day);
           if (success) {
             const today = new Date();
+            const dateStr = today.toISOString().split('T')[0];
+            
+            // Record history for replacement
             await recordHistory(
-              today.toISOString().split('T')[0],
-              'replacement',
-              day,
-              'Replaced ' + currentUser.username + ' with ' + selectedUsername,
-              0,
-              selectedUsername
+                dateStr,
+                'replacement',
+                day,
+                'Replaced ' + currentUser.username + ' with ' + selectedUsername,
+                0,
+                selectedUsername
             );
+            
+            // Send notification to the original user (User A)
+            await createNotification(
+                currentUser.id,
+                '🔄 Replacement Confirmed',
+                'You have been replaced by ' + selectedFullName + ' for ' + day + '.',
+                'replacement'
+            );
+            
+            // Send notification to the replacement user (User B)
+            await createNotification(
+                selectedUserId,
+                '🔄 You\'ve Been Added as a Replacement',
+                'You have been added as a replacement for ' + day + ' by ' + currentUser.username + '.',
+                'replacement'
+            );
+            
             window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
             document.getElementById('replacementModal').style.display = 'none';
             await renderDashboard();
+            await updateNotificationBadge();
           } else {
             window.showToast('❌ Failed to add replacement. Please try again.', 'error');
           }
@@ -1207,7 +1302,7 @@ async function openReplacementModal(day) {
   }
 }
 
-// ============ OPT OUT WITH HISTORY RECORDING ============
+// ============ OPT OUT WITH NOTIFICATIONS ============
 async function handleOptOut(day, bookingId, action) {
     const user = window.getCurrentUser();
     if (!user) return;
@@ -1255,11 +1350,22 @@ async function handleOptOut(day, bookingId, action) {
                 'Penalty received for cancelling after court was booked',
                 10.00
             );
+            
+            // Send notification to the user
+            await createNotification(
+                user.id,
+                '💰 Penalty Recorded',
+                'You have received a $10.00 penalty for cancelling ' + day + ' after the court was booked. Please pay within 7 days.',
+                'penalty',
+                bookingId
+            );
+            
             await removeUserFromBooking(day, user.id);
             window.showToast('💰 Penalty recorded. You have been removed from the booking.', 'success');
             closeOptOutModal();
             openPenaltyModal(day, bookingId);
             await renderDashboard();
+            await updateNotificationBadge();
         } else {
             window.showToast('❌ Failed to process penalty. Please try again.', 'error');
         }
@@ -1267,7 +1373,7 @@ async function handleOptOut(day, bookingId, action) {
     }
 }
 
-// ============ PENALTY PAY WITH HISTORY ============
+// ============ PENALTY PAY WITH NOTIFICATIONS ============
 async function handlePenaltyPay(bookingId, day) {
     const user = window.getCurrentUser();
     if (!user) return;
@@ -1276,18 +1382,31 @@ async function handlePenaltyPay(bookingId, day) {
         const success = await recordPenalty(user.id, bookingId);
         if (success) {
             const today = new Date();
+            const dateStr = today.toISOString().split('T')[0];
+            
             await recordHistory(
-                today.toISOString().split('T')[0],
+                dateStr,
                 'penalty_paid',
                 day,
                 'Paid $10.00 penalty',
                 10.00
             );
+            
+            // Send notification to the user
+            await createNotification(
+                user.id,
+                '✅ Penalty Paid',
+                'You have paid the $10.00 penalty for ' + day + '. Thank you!',
+                'info',
+                bookingId
+            );
+            
             await removeUserFromBooking(day, user.id);
             window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
             document.getElementById('penaltyModal').style.display = 'none';
             await renderDashboard();
             await renderNotificationsPage();
+            await updateNotificationBadge();
         } else {
             window.showToast('❌ Failed to process penalty. Please try again.', 'error');
         }
@@ -1386,6 +1505,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         renderDashboard();
         setInterval(renderDashboard, 30000);
+        updateNotificationBadge();
         
         // MENU
         const menuToggle = document.getElementById('menuToggle');

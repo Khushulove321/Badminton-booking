@@ -513,3 +513,106 @@ app.get('/api/booking/monthly-history', authenticate, async (req, res) => {
     res.json([]);
   }
 });
+
+// Create notifications table
+// Run this in Supabase SQL Editor first:
+/*
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT CHECK (type IN ('penalty', 'replacement', 'info', 'warning')),
+  related_id UUID,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+*/
+
+// Get user's notifications
+app.get('/api/booking/my-notifications', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const { data: notifications, error } = await supabaseAdmin
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+      
+    if (error) throw error;
+    
+    res.json(notifications || []);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.json([]);
+  }
+});
+
+// Mark notification as read
+app.post('/api/booking/notification-read', authenticate, async (req, res) => {
+  try {
+    const { notification_id } = req.body;
+    const userId = req.user.id;
+    
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notification_id)
+      .eq('user_id', userId)
+      .select();
+      
+    if (error) throw error;
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+    res.status(500).json({ error: 'Error marking notification read' });
+  }
+});
+
+// Create notification function
+app.post('/api/booking/create-notification', authenticate, async (req, res) => {
+  try {
+    const { user_id, title, message, type, related_id } = req.body;
+    
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: user_id,
+        title: title,
+        message: message,
+        type: type || 'info',
+        related_id: related_id || null
+      })
+      .select();
+      
+    if (error) throw error;
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ error: 'Error creating notification' });
+  }
+});
+
+// Get unread notification count
+app.get('/api/booking/unread-count', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const { count, error } = await supabaseAdmin
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+      
+    if (error) throw error;
+    
+    res.json({ count: count || 0 });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.json({ count: 0 });
+  }
+});
