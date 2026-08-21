@@ -3,11 +3,62 @@
 console.log('📚 booking.js loaded');
 
 const ADMIN_CODE = 'admin123';
-
-// Global state for opt out
 let optOutDay = null;
 let selectedBookingId = null;
 let currentUser = null;
+let currentView = 'dashboard';
+
+// RULES DATA
+const RULES_DATA = [
+    {
+        category: '📋 Booking Rules',
+        rules: [
+            'Selection opens every Monday (12:00 AM - 11:59 PM)',
+            'You must select your availability for the NEXT week',
+            'You can select multiple days if you are available',
+            'Once selected, you are committed to playing on that day',
+            'If you cannot make it, you must find a replacement or pay a penalty'
+        ]
+    },
+    {
+        category: '⚠️ Cancellation Policy',
+        rules: [
+            'If you cancel BEFORE the court is booked: ❌ No penalty',
+            'If you cancel AFTER the court is booked: 💰 $10 penalty',
+            'You must notify the admin at least 24 hours in advance',
+            'Last-minute cancellations will result in an automatic penalty'
+        ]
+    },
+    {
+        category: '🔄 Replacement Rules',
+        rules: [
+            'You can find a replacement from the available players list',
+            'The replacement must be approved by the admin',
+            'The replacement takes full responsibility for the booking',
+            'If no replacement is found, you must pay the penalty'
+        ]
+    },
+    {
+        category: '💰 Penalty Rules',
+        rules: [
+            'Penalty amount: $10.00 per cancellation after booking',
+            'Penalties must be paid within 7 days',
+            'Unpaid penalties will result in suspension',
+            '3 unpaid penalties = 1 week suspension',
+            'Payments go towards the court rental fund'
+        ]
+    },
+    {
+        category: '📅 Selection Window',
+        rules: [
+            'Selection opens: Monday 12:00 AM',
+            'Selection closes: Monday 11:59 PM',
+            'You have 24 hours to make your selections',
+            'After closing, you can only view your selections',
+            'Admin will randomly select players after the window closes'
+        ]
+    }
+];
 
 // Get next week's dates
 function getNextWeekDates() {
@@ -35,11 +86,7 @@ function getNextWeekDates() {
         weekDates.push({
             day: dayNames[i],
             date: date,
-            dateString: date.toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric', 
-                year: 'numeric' 
-            })
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         });
     }
     return weekDates;
@@ -62,11 +109,7 @@ function getThisWeekDates() {
         weekDates.push({
             day: dayNames[i],
             date: date,
-            dateString: date.toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric', 
-                year: 'numeric' 
-            })
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         });
     }
     return weekDates;
@@ -75,14 +118,20 @@ function getThisWeekDates() {
 function isSelectionWindowOpen() {
     const now = new Date();
     const day = now.getDay();
-    return day === 1;
+    // Check if admin has opened bookings
+    const adminOpen = localStorage.getItem('adminOpenBookings') === 'true';
+    return day === 1 || adminOpen;
 }
 
 function getTimeRemaining() {
     const now = new Date();
     const day = now.getDay();
     
-    if (day !== 1) return 'Window closed';
+    if (day !== 1) {
+        const adminOpen = localStorage.getItem('adminOpenBookings') === 'true';
+        if (adminOpen) return 'Admin has opened bookings';
+        return 'Window closed';
+    }
     
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
@@ -101,6 +150,15 @@ function canEdit() {
 function getSelectionStatus() {
     const now = new Date();
     const day = now.getDay();
+    const adminOpen = localStorage.getItem('adminOpenBookings') === 'true';
+    
+    if (adminOpen) {
+        return {
+            status: 'open',
+            message: '🔓 Admin has opened bookings',
+            className: 'open'
+        };
+    }
     
     if (day !== 1) {
         const nextMonday = new Date(now);
@@ -123,20 +181,146 @@ function getSelectionStatus() {
     };
 }
 
+// RULES PAGE
+function renderRulesPage() {
+    const container = document.querySelector('#rulesView .rules-content');
+    if (!container) return;
+    
+    let html = '';
+    for (let i = 0; i < RULES_DATA.length; i++) {
+        const section = RULES_DATA[i];
+        html += '<div class="rules-section">';
+        html += '<h3>' + section.category + '</h3>';
+        html += '<ul>';
+        for (let j = 0; j < section.rules.length; j++) {
+            html += '<li>' + section.rules[j] + '</li>';
+        }
+        html += '</ul>';
+        html += '</div>';
+    }
+    container.innerHTML = html;
+}
+
+// NOTIFICATIONS PAGE
+async function renderNotificationsPage() {
+    const container = document.getElementById('notificationsList');
+    if (!container) return;
+    
+    container.innerHTML = 'Loading notifications...';
+    
+    try {
+        const user = window.getCurrentUser();
+        if (!user) {
+            container.innerHTML = '<p style="color: #888;">Please login to view notifications.</p>';
+            return;
+        }
+        
+        // Get pending penalties for this user
+        const token = window.getToken();
+        const response = await fetch(window.API_URL + '/booking/my-penalties', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        
+        if (!response.ok) {
+            container.innerHTML = '<p style="color: #888;">No notifications.</p>';
+            return;
+        }
+        
+        const penalties = await response.json();
+        
+        if (!penalties || penalties.length === 0) {
+            container.innerHTML = '<p style="color: #888;">🎉 No notifications! You have no pending penalties.</p>';
+            // Update badge
+            document.getElementById('notificationBadge').style.display = 'none';
+            return;
+        }
+        
+        // Update badge
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            badge.style.display = 'inline-block';
+            badge.textContent = penalties.length;
+        }
+        
+        let html = '<h3>💰 Pending Penalties</h3>';
+        html += '<p style="color: #666;margin-bottom:20px;">You have ' + penalties.length + ' penalty(ies) that need to be paid.</p>';
+        
+        for (let i = 0; i < penalties.length; i++) {
+            const p = penalties[i];
+            html += '<div class="notification-item">';
+            html += '<div class="notification-icon">💰</div>';
+            html += '<div class="notification-content">';
+            html += '<div class="notification-title">Penalty for ' + (p.day || 'Unknown day') + '</div>';
+            html += '<div class="notification-details">Amount: $' + (p.amount || '10.00') + ' | Status: ' + (p.status || 'pending') + '</div>';
+            html += '<div class="notification-date">' + new Date(p.created_at).toLocaleDateString() + '</div>';
+            html += '<button class="btn btn-danger btn-sm pay-penalty-btn" data-id="' + p.id + '">Pay Now</button>';
+            html += '</div>';
+            html += '</div>';
+        }
+        container.innerHTML = html;
+        
+        // Add event listeners for pay buttons
+        const payBtns = container.querySelectorAll('.pay-penalty-btn');
+        for (let i = 0; i < payBtns.length; i++) {
+            payBtns[i].addEventListener('click', function() {
+                const id = this.dataset.id;
+                if (confirm('Are you sure you want to pay this penalty?')) {
+                    payPenalty(id);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+        container.innerHTML = '<p style="color: red;">Failed to load notifications.</p>';
+    }
+}
+
+async function payPenalty(penaltyId) {
+    const token = window.getToken();
+    if (!token) return;
+    
+    try {
+        const response = await fetch(window.API_URL + '/booking/pay-penalty', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ penalty_id: penaltyId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to pay penalty');
+        
+        window.showToast('✅ Penalty paid successfully!', 'success');
+        await renderNotificationsPage();
+        // Update badge
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            const current = parseInt(badge.textContent) || 0;
+            if (current <= 1) {
+                badge.style.display = 'none';
+            } else {
+                badge.textContent = current - 1;
+            }
+        }
+    } catch (error) {
+        console.error('Error paying penalty:', error);
+        window.showToast('❌ Failed to pay penalty.', 'error');
+    }
+}
+
+// DASHBOARD FUNCTIONS
 async function getAvailability(weekType = 'next') {
     const token = window.getToken();
     if (!token) return [];
 
     try {
         const response = await fetch(window.API_URL + '/booking/availability?week=' + weekType, {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+            headers: { 'Authorization': 'Bearer ' + token }
         });
         
         if (!response.ok) throw new Error('Failed to fetch availability');
-        const data = await response.json();
-        return data;
+        return await response.json();
     } catch (error) {
         console.error('Error fetching availability:', error);
         return [];
@@ -183,9 +367,7 @@ async function getMyAvailability() {
 
     try {
         const response = await fetch(window.API_URL + '/booking/my-availability', {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+            headers: { 'Authorization': 'Bearer ' + token }
         });
 
         if (!response.ok) throw new Error('Failed to fetch your availability');
@@ -202,9 +384,7 @@ async function getAllUsersAvailability() {
 
     try {
         const response = await fetch(window.API_URL + '/booking/all-users', {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+            headers: { 'Authorization': 'Bearer ' + token }
         });
 
         if (!response.ok) throw new Error('Failed to fetch users');
@@ -221,9 +401,7 @@ async function getSelectedPlayers() {
 
     try {
         const response = await fetch(window.API_URL + '/booking/selected-players', {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+            headers: { 'Authorization': 'Bearer ' + token }
         });
 
         if (!response.ok) throw new Error('Failed to fetch selected players');
@@ -240,9 +418,7 @@ async function getAvailableUsersForDay(day) {
 
     try {
         const response = await fetch(window.API_URL + '/booking/availability?week=next', {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+            headers: { 'Authorization': 'Bearer ' + token }
         });
         if (!response.ok) return [];
         const data = await response.json();
@@ -325,6 +501,63 @@ async function recordPenalty(userId, bookingId) {
     }
 }
 
+// ADMIN: Open all bookings
+async function openAllBookings() {
+    if (!confirm('⚠️ Are you sure you want to open all bookings? This will allow all users to select their availability for next week.')) return;
+    
+    // Store in localStorage so all users can see it
+    localStorage.setItem('adminOpenBookings', 'true');
+    
+    // Also send to server to persist
+    const token = window.getToken();
+    if (token) {
+        try {
+            await fetch(window.API_URL + '/booking/admin-open', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ open: true })
+            });
+        } catch (error) {
+            console.error('Error notifying server:', error);
+        }
+    }
+    
+    document.getElementById('openAllStatus').textContent = '✅ Bookings are now OPEN for everyone!';
+    document.getElementById('openAllStatus').style.color = '#48bb78';
+    window.showToast('✅ Bookings opened for all users!', 'success');
+    await renderDashboard();
+}
+
+// ADMIN: Close all bookings
+async function closeAllBookings() {
+    localStorage.setItem('adminOpenBookings', 'false');
+    
+    const token = window.getToken();
+    if (token) {
+        try {
+            await fetch(window.API_URL + '/booking/admin-open', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ open: false })
+            });
+        } catch (error) {
+            console.error('Error notifying server:', error);
+        }
+    }
+    
+    document.getElementById('openAllStatus').textContent = '🔒 Bookings closed';
+    document.getElementById('openAllStatus').style.color = '#f56565';
+    window.showToast('🔒 Bookings closed', 'info');
+    await renderDashboard();
+}
+
+// RENDER FUNCTIONS
 function renderDayCard(dayData, canEditBool, isBooked) {
     const card = document.createElement('div');
     card.className = 'day-card';
@@ -495,6 +728,27 @@ async function renderDashboard() {
         var adminControls = document.getElementById('adminControls');
         if (adminControls) {
             adminControls.style.display = isAdmin ? 'block' : 'none';
+            if (isAdmin) {
+                var openBtn = document.getElementById('openAllBookingsBtn');
+                if (openBtn) {
+                    openBtn.onclick = function() {
+                        if (localStorage.getItem('adminOpenBookings') === 'true') {
+                            closeAllBookings();
+                        } else {
+                            openAllBookings();
+                        }
+                    };
+                    // Update button text
+                    if (localStorage.getItem('adminOpenBookings') === 'true') {
+                        openBtn.textContent = '🔒 Close All Bookings';
+                        document.getElementById('openAllStatus').textContent = '✅ Bookings are OPEN for everyone!';
+                        document.getElementById('openAllStatus').style.color = '#48bb78';
+                    } else {
+                        openBtn.textContent = '🔓 Open All Bookings';
+                        document.getElementById('openAllStatus').textContent = '';
+                    }
+                }
+            }
         }
         
         var panelAdmin = document.getElementById('panelAdmin');
@@ -558,9 +812,38 @@ async function renderDashboard() {
         var selected = await getSelectedPlayers();
         renderSelectedPlayers(selected);
         
+        // Check notifications
+        await checkNotifications();
+        
     } catch (error) {
         console.error('Error rendering dashboard:', error);
         daysGrid.innerHTML = '<div class="error-message">Failed to load availability. Please refresh.</div>';
+    }
+}
+
+async function checkNotifications() {
+    try {
+        const token = window.getToken();
+        if (!token) return;
+        
+        const response = await fetch(window.API_URL + '/booking/my-penalties', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        
+        if (!response.ok) return;
+        const penalties = await response.json();
+        
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            if (penalties && penalties.length > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = penalties.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking notifications:', error);
     }
 }
 
@@ -577,6 +860,7 @@ async function handleToggleAvailability(day, date) {
     if (result) await renderDashboard();
 }
 
+// ADMIN PANEL
 async function openAdminPanel() {
     var modal = document.getElementById('adminModal');
     if (!modal) return;
@@ -634,6 +918,7 @@ async function loadAllUsersAvailability() {
     }
 }
 
+// SIDE PANEL
 function openSidePanel() {
     var panel = document.getElementById('sidePanel');
     var main = document.getElementById('mainContent');
@@ -648,6 +933,19 @@ function closeSidePanel() {
     if (main) main.classList.remove('shifted');
 }
 
+// Switch Views
+function switchView(view) {
+    currentView = view;
+    document.getElementById('dashboardView').style.display = view === 'dashboard' ? 'block' : 'none';
+    document.getElementById('rulesView').style.display = view === 'rules' ? 'block' : 'none';
+    document.getElementById('notificationsView').style.display = view === 'notifications' ? 'block' : 'none';
+    
+    if (view === 'rules') renderRulesPage();
+    if (view === 'notifications') renderNotificationsPage();
+    closeSidePanel();
+}
+
+// OPT OUT HANDLERS
 async function handleOptOut(day, bookingId, action) {
     var user = window.getCurrentUser();
     if (!user) return;
@@ -757,12 +1055,15 @@ async function handlePenaltyPay(bookingId, day) {
             window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
             document.getElementById('penaltyModal').style.display = 'none';
             await renderDashboard();
+            // Refresh notifications
+            await renderNotificationsPage();
         } else {
             window.showToast('❌ Failed to process penalty. Please try again.', 'error');
         }
     }
 }
 
+// INITIALIZATION
 document.addEventListener('DOMContentLoaded', function() {
     if (window.location.pathname.includes('dashboard.html')) {
         var user = window.getCurrentUser();
@@ -791,6 +1092,7 @@ document.addEventListener('DOMContentLoaded', function() {
         renderDashboard();
         setInterval(renderDashboard, 30000);
         
+        // MENU
         var menuToggle = document.getElementById('menuToggle');
         if (menuToggle) {
             menuToggle.addEventListener('click', openSidePanel);
@@ -801,6 +1103,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closePanel.addEventListener('click', closeSidePanel);
         }
         
+        // WEEK BUTTONS
         var thisWeekBtn = document.getElementById('thisWeekBtn');
         var nextWeekBtn = document.getElementById('nextWeekBtn');
         
@@ -822,62 +1125,45 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        var panelMyAvailability = document.getElementById('panelMyAvailability');
-        if (panelMyAvailability) {
-            panelMyAvailability.addEventListener('click', function() {
-                closeSidePanel();
-                var section = document.getElementById('myAvailability');
-                if (section) section.scrollIntoView({ behavior: 'smooth' });
-            });
-        }
+        // PANEL BUTTONS
+        document.getElementById('panelMyAvailability').addEventListener('click', function() {
+            switchView('dashboard');
+            var section = document.getElementById('myAvailability');
+            if (section) section.scrollIntoView({ behavior: 'smooth' });
+        });
         
-        var panelAdmin = document.getElementById('panelAdmin');
-        if (panelAdmin) {
-            panelAdmin.addEventListener('click', openAdminPanel);
-        }
+        document.getElementById('panelRules').addEventListener('click', function() {
+            switchView('rules');
+        });
         
-        var panelRules = document.getElementById('panelRules');
-        if (panelRules) {
-            panelRules.addEventListener('click', function() {
-                alert('📋 Rules page coming soon!');
-            });
-        }
+        document.getElementById('panelNotifications').addEventListener('click', function() {
+            switchView('notifications');
+        });
         
-        var panelLogout = document.getElementById('panelLogout');
-        if (panelLogout) {
-            panelLogout.addEventListener('click', function() {
-                window.logoutUser();
-            });
-        }
+        document.getElementById('panelAdmin').addEventListener('click', openAdminPanel);
         
-        var closeAdminModal = document.getElementById('closeAdminModal');
-        if (closeAdminModal) {
-            closeAdminModal.addEventListener('click', function() {
-                document.getElementById('adminModal').style.display = 'none';
-            });
-        }
+        document.getElementById('panelLogout').addEventListener('click', function() {
+            window.logoutUser();
+        });
+        
+        // ADMIN MODAL
+        document.getElementById('closeAdminModal').addEventListener('click', function() {
+            document.getElementById('adminModal').style.display = 'none';
+        });
         
         window.addEventListener('click', function(e) {
             var modal = document.getElementById('adminModal');
             if (e.target === modal) modal.style.display = 'none';
         });
         
-        var verifyBtn = document.getElementById('verifyAdminBtn');
-        if (verifyBtn) {
-            verifyBtn.addEventListener('click', verifyAdmin);
-        }
+        document.getElementById('verifyAdminBtn').addEventListener('click', verifyAdmin);
         
-        var adminCodeInput = document.getElementById('adminCode');
-        if (adminCodeInput) {
-            adminCodeInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') verifyAdmin();
-            });
-        }
+        document.getElementById('adminCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') verifyAdmin();
+        });
         
-        var closeOptOutModalBtn = document.getElementById('closeOptOutModal');
-        if (closeOptOutModalBtn) {
-            closeOptOutModalBtn.addEventListener('click', closeOptOutModal);
-        }
+        // OPT OUT MODAL
+        document.getElementById('closeOptOutModal').addEventListener('click', closeOptOutModal);
         
         document.getElementById('optOutCancel').addEventListener('click', function() {
             handleOptOut(optOutDay, selectedBookingId, 'cancel');
@@ -892,23 +1178,19 @@ document.addEventListener('DOMContentLoaded', function() {
             handleOptOut(optOutDay, selectedBookingId, 'penalty');
         });
         
-        var closeReplacementModal = document.getElementById('closeReplacementModal');
-        if (closeReplacementModal) {
-            closeReplacementModal.addEventListener('click', function() {
-                document.getElementById('replacementModal').style.display = 'none';
-            });
-        }
+        // REPLACEMENT MODAL
+        document.getElementById('closeReplacementModal').addEventListener('click', function() {
+            document.getElementById('replacementModal').style.display = 'none';
+        });
         
         document.getElementById('replacementCancel').addEventListener('click', function() {
             document.getElementById('replacementModal').style.display = 'none';
         });
         
-        var closePenaltyModal = document.getElementById('closePenaltyModal');
-        if (closePenaltyModal) {
-            closePenaltyModal.addEventListener('click', function() {
-                document.getElementById('penaltyModal').style.display = 'none';
-            });
-        }
+        // PENALTY MODAL
+        document.getElementById('closePenaltyModal').addEventListener('click', function() {
+            document.getElementById('penaltyModal').style.display = 'none';
+        });
         
         document.getElementById('penaltyCancel').addEventListener('click', function() {
             document.getElementById('penaltyModal').style.display = 'none';
@@ -920,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', function() {
             handlePenaltyPay(bookingId, day);
         });
         
+        // CLICK OUTSIDE MODALS
         window.addEventListener('click', function(e) {
             var optOutModal = document.getElementById('optOutModal');
             var replacementModal = document.getElementById('replacementModal');
@@ -930,11 +1213,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === penaltyModal) document.getElementById('penaltyModal').style.display = 'none';
         });
         
-        var logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', function() {
-                window.logoutUser();
-            });
-        }
+        // LOGOUT
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            window.logoutUser();
+        });
     }
 });

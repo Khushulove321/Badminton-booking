@@ -18,6 +18,7 @@
             <button class="panel-btn" id="panelMyAvailability">📅 My Availability</button>
             <button class="panel-btn" id="panelHistory">📜 My History</button>
             <button class="panel-btn" id="panelRules">📋 Rules</button>
+            <button class="panel-btn" id="panelNotifications">🔔 Notifications</button>
             <button class="panel-btn" id="panelAdmin" style="display:none;">👑 Admin Panel</button>
             <hr class="panel-divider">
             <button class="panel-btn" id="panelLogout">🚪 Logout</button>
@@ -31,56 +32,85 @@
             <div class="nav-brand">🏸 Badminton Booking</div>
             <div class="nav-user">
                 <span id="userName">Welcome, User</span>
+                <span id="notificationBadge" class="badge" style="display:none;background:#f56565;color:white;padding:2px 8px;border-radius:12px;font-size:0.7rem;">0</span>
                 <button id="logoutBtn" class="btn btn-secondary btn-sm" style="display:none;">Logout</button>
             </div>
         </nav>
 
-        <div class="dashboard">
-            <div class="dashboard-header">
-                <h2>📅 Weekly Availability</h2>
-                <div class="week-selector">
-                    <div id="weekDisplay" class="week-display">Selecting for: Loading...</div>
-                    <div class="week-buttons">
-                        <button id="thisWeekBtn" class="btn btn-secondary btn-sm">This Week</button>
-                        <button id="nextWeekBtn" class="btn btn-primary btn-sm">Next Week</button>
+        <!-- Main Content Area -->
+        <div id="mainContentArea">
+            <!-- Dashboard View -->
+            <div id="dashboardView">
+                <div class="dashboard">
+                    <div class="dashboard-header">
+                        <h2>📅 Weekly Availability</h2>
+                        <div class="week-selector">
+                            <div id="weekDisplay" class="week-display">Selecting for: Loading...</div>
+                            <div class="week-buttons">
+                                <button id="thisWeekBtn" class="btn btn-secondary btn-sm">This Week</button>
+                                <button id="nextWeekBtn" class="btn btn-primary btn-sm">Next Week</button>
+                            </div>
+                        </div>
+                        <div id="selectionStatus" class="selection-status">
+                            <span class="status-indicator"></span>
+                            <span class="status-text">Loading...</span>
+                        </div>
+                        <div id="deadlineWarning" class="warning-banner" style="display:none;">
+                            ⚠️ Selection window is closed. You can only view your selections.
+                        </div>
+                        <div id="adminControls" style="display: none;">
+                            <p class="admin-badge">👑 Admin Controls</p>
+                            <button id="openAllBookingsBtn" class="btn btn-warning">🔓 Open All Bookings</button>
+                            <span id="openAllStatus" style="margin-left:10px;font-size:0.9rem;color:#666;"></span>
+                        </div>
+                    </div>
+
+                    <div class="days-grid" id="daysGrid">
+                        <!-- Days will be rendered here -->
+                    </div>
+
+                    <div class="selected-players-section">
+                        <h3>🏆 Selected Players for This Week</h3>
+                        <div id="selectedPlayersGrid" class="selected-players-grid">
+                            <p style="color: #888;">Loading selected players...</p>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <div class="info-card">
+                            <h3>📊 How it Works</h3>
+                            <ul>
+                                <li>Selection opens every Monday (all day)</li>
+                                <li>Select your availability for the NEXT week</li>
+                                <li>Click "In for [Day]" to mark yourself available</li>
+                                <li>Admin will randomly select players after Monday</li>
+                            </ul>
+                        </div>
+                        <div class="info-card" id="myAvailability">
+                            <h3>📋 My Availability</h3>
+                            <div id="myDaysList">Loading...</div>
+                        </div>
                     </div>
                 </div>
-                <div id="selectionStatus" class="selection-status">
-                    <span class="status-indicator"></span>
-                    <span class="status-text">Loading...</span>
-                </div>
-                <div id="deadlineWarning" class="warning-banner" style="display:none;">
-                    ⚠️ Selection window is closed. You can only view your selections.
-                </div>
-                <div id="adminControls" style="display: none;">
-                    <p class="admin-badge">👑 Admin Controls</p>
+            </div>
+
+            <!-- Rules View -->
+            <div id="rulesView" style="display:none;">
+                <div class="dashboard">
+                    <h2>📋 Rules & Penalties</h2>
+                    <div class="rules-content">
+                        <!-- Rules will be rendered here -->
+                    </div>
                 </div>
             </div>
 
-            <div class="days-grid" id="daysGrid">
-                <!-- Days will be rendered here -->
-            </div>
-
-            <div class="selected-players-section">
-                <h3>🏆 Selected Players for This Week</h3>
-                <div id="selectedPlayersGrid" class="selected-players-grid">
-                    <p style="color: #888;">Loading selected players...</p>
-                </div>
-            </div>
-
-            <div class="info-section">
-                <div class="info-card">
-                    <h3>📊 How it Works</h3>
-                    <ul>
-                        <li>Selection opens every Monday (all day)</li>
-                        <li>Select your availability for the NEXT week</li>
-                        <li>Click "In for [Day]" to mark yourself available</li>
-                        <li>Admin will randomly select players after Monday</li>
-                    </ul>
-                </div>
-                <div class="info-card" id="myAvailability">
-                    <h3>📋 My Availability</h3>
-                    <div id="myDaysList">Loading...</div>
+            <!-- Notifications View -->
+            <div id="notificationsView" style="display:none;">
+                <div class="dashboard">
+                    <h2>🔔 Notifications</h2>
+                    <div id="notificationsList">
+                        Loading notifications...
+                    </div>
                 </div>
             </div>
         </div>
