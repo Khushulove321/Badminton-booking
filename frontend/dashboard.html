@@ -19,7 +19,7 @@
             <button class="panel-btn" id="panelHistory">📜 My History</button>
             <button class="panel-btn" id="panelRules">📋 Rules</button>
             <button class="panel-btn" id="panelAdmin" style="display:none;">👑 Admin Panel</button>
-            <hr>
+            <hr class="panel-divider">
             <button class="panel-btn" id="panelLogout">🚪 Logout</button>
         </div>
     </div>
@@ -74,9 +74,8 @@
                     <ul>
                         <li>Selection opens every Monday (all day)</li>
                         <li>Select your availability for the NEXT week</li>
-                        <li>Click on a day to mark your availability</li>
-                        <li>Click again to unmark</li>
-                        <li>Admin randomly selects a player for each day</li>
+                        <li>Click "In for [Day]" to mark yourself available</li>
+                        <li>Admin will randomly select players after Monday</li>
                     </ul>
                 </div>
                 <div class="info-card" id="myAvailability">
@@ -87,22 +86,65 @@
         </div>
     </div>
 
+    <!-- Opt Out Modal -->
+    <div id="optOutModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="close-btn" id="closeOptOutModal">&times;</button>
+            <h2>⚠️ Opt Out</h2>
+            <p>Are you sure you want to opt out of <strong id="optOutDay"></strong>?</p>
+            <div class="modal-actions">
+                <button id="optOutCancel" class="btn btn-secondary">Cancel</button>
+                <button id="optOutNotBooked" class="btn btn-success">Court hasn't been booked (No penalty)</button>
+                <button id="optOutReplace" class="btn btn-warning">Replace player</button>
+                <button id="optOutPenalty" class="btn btn-danger">Pay penalty</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Replacement Modal -->
+    <div id="replacementModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="close-btn" id="closeReplacementModal">&times;</button>
+            <h2>🔄 Select Replacement</h2>
+            <p>Choose a player to take your spot for <strong id="replaceDay"></strong>:</p>
+            <div id="replacementList" class="replacement-list">
+                Loading players...
+            </div>
+            <button id="replacementCancel" class="btn btn-secondary" style="margin-top:15px;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Penalty Modal -->
+    <div id="penaltyModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="close-btn" id="closePenaltyModal">&times;</button>
+            <h2>💰 Pay Penalty</h2>
+            <div class="penalty-details">
+                <p>⚠️ You are opting out after the court has been booked.</p>
+                <p>📋 According to the rules, you must pay a penalty.</p>
+            </div>
+            <div class="penalty-amount">$10.00</div>
+            <p style="text-align:center;color:#666;margin-bottom:20px;">This penalty goes towards the court rental fund.</p>
+            <div class="modal-actions">
+                <button id="penaltyCancel" class="btn btn-secondary">Cancel</button>
+                <button id="penaltyPay" class="btn btn-danger">💳 Pay Penalty</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Admin Panel Modal -->
     <div id="adminModal" class="modal" style="display:none;">
         <div class="modal-content">
-            <span class="close-btn" id="closeModal">&times;</span>
+            <button class="close-btn" id="closeAdminModal">&times;</button>
             <h2>👑 Admin Panel</h2>
             <p>Enter admin code to access:</p>
-            <input type="password" id="adminCode" placeholder="Enter admin code">
-            <button id="verifyAdminBtn" class="btn btn-primary">Verify</button>
-            <div id="adminError" style="color: red; display: none;">❌ Incorrect code</div>
+            <input type="password" id="adminCode" placeholder="Enter admin code" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin:10px 0;">
+            <button id="verifyAdminBtn" class="btn btn-primary" style="width:100%;">Verify</button>
+            <div id="adminError" style="color: red; display: none; margin-top:10px;">❌ Incorrect code</div>
             
-            <div id="adminContent" style="display: none;">
+            <div id="adminContent" style="display: none; margin-top:20px;">
                 <h3>📊 All Users' Availability</h3>
                 <div id="allUsersAvailability">Loading...</div>
-                <hr>
-                <button id="randomSelectAllBtn" class="btn btn-primary">🎲 Random Select All Days</button>
-                <button id="resetAllBtn" class="btn btn-danger">🔄 Reset All</button>
             </div>
         </div>
     </div>
