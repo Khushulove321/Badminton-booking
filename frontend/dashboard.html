@@ -70,23 +70,24 @@
 
                     <div class="days-grid" id="daysGrid"></div>
 
-                    <!-- SELECTED PLAYERS TABLE -->
+                    <!-- TWO WEEK TABLE -->
                     <div class="selected-players-section">
-                        <h3>🏆 Court Bookers for Week After Next</h3>
+                        <h3>🏆 Court Bookers for This Week & Next Week</h3>
                         <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
-                            These players will book the court for the week after next. Updated every Sunday night.
-                            <span id="sundayIndicator" style="display:none;color:#f56565;font-weight:600;">🧪 SUNDAY SIMULATION ACTIVE</span>
+                            <span id="sundayIndicator" style="display:none;color:#f56565;font-weight:600;">🧪 SUNDAY SIMULATION ACTIVE - </span>
+                            Shows who is booking the court for this week and who will book for next week.
                         </p>
                         <div id="selectedPlayersTable" class="selected-players-table">
                             <table>
                                 <thead>
                                     <tr>
                                         <th>Day</th>
-                                        <th>Selected Player</th>
+                                        <th>This Week</th>
+                                        <th>Next Week</th>
                                     </tr>
                                 </thead>
                                 <tbody id="selectedPlayersBody">
-                                    <tr><td colspan="2" style="text-align:center;color:#888;">Loading selected players...</td></tr>
+                                    <tr><td colspan="3" style="text-align:center;color:#888;">Loading selected players...</td></tr>
                                 </tbody>
                             </table>
                         </div>
