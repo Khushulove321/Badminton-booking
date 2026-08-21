@@ -616,3 +616,278 @@ app.get('/api/booking/unread-count', authenticate, async (req, res) => {
     res.json({ count: 0 });
   }
 });
+
+// Get pending replacement requests for a user
+app.get('/api/booking/pending-replacements', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const { data: replacements, error } = await supabaseAdmin
+      .from('replacements')
+      .select(`
+        *,
+        original_user:original_user_id (
+          id,
+          username,
+          full_name
+        ),
+        replacement_user:replacement_user_id (
+          id,
+          username,
+          full_name
+        )
+      `)
+      .eq('replacement_user_id', userId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    res.json(replacements || []);
+  } catch (error) {
+    console.error('Error fetching pending replacements:', error);
+    res.json([]);
+  }
+});
+
+// Accept replacement request
+app.post('/api/booking/accept-replacement', authenticate, async (req, res) => {
+  try {
+    const { replacement_id } = req.body;
+    const userId = req.user.id;
+    
+    // Get the replacement request
+    const { data: replacement, error: getError } = await supabaseAdmin
+      .from('replacements')
+      .select('*')
+      .eq('id', replacement_id)
+      .eq('replacement_user_id', userId)
+      .eq('status', 'pending')
+      .single();
+      
+    if (getError) throw getError;
+    
+    if (!replacement) {
+      return res.status(404).json({ error: 'Replacement request not found' });
+    }
+    
+    // Update replacement status
+    const { error: updateError } = await supabaseAdmin
+      .from('replacements')
+      .update({ status: 'accepted', updated_at: new Date() })
+      .eq('id', replacement_id);
+      
+    if (updateError) throw updateError;
+    
+    // Get booking ID for the day
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from('bookings')
+      .select('id')
+      .eq('day', replacement.day)
+      .single();
+      
+    if (bookingError) throw bookingError;
+    
+    // Remove original user from availability
+    const { error: deleteError } = await supabaseAdmin
+      .from('availability')
+      .delete()
+      .eq('user_id', replacement.original_user_id)
+      .eq('booking_id', booking.id);
+      
+    if (deleteError) throw deleteError;
+    
+    // Add replacement user to availability
+    const { error: insertError } = await supabaseAdmin
+      .from('availability')
+      .insert({
+        user_id: replacement.replacement_user_id,
+        booking_id: booking.id
+      });
+      
+    if (insertError) throw insertError;
+    
+    // Record history for both users
+    const today = new Date().toISOString().split('T')[0];
+    
+    // History for original user (User A)
+    await supabaseAdmin
+      .from('history')
+      .insert({
+        user_id: replacement.original_user_id,
+        event_date: today,
+        action_type: 'replacement',
+        day: replacement.day,
+        description: 'Replaced by ' + (replacement.replacement_user?.username || 'another user'),
+        related_user: replacement.replacement_user?.username || 'another user'
+      });
+      
+    // History for replacement user (User B)
+    await supabaseAdmin
+      .from('history')
+      .insert({
+        user_id: replacement.replacement_user_id,
+        event_date: today,
+        action_type: 'replacement',
+        day: replacement.day,
+        description: 'Accepted replacement for ' + replacement.day,
+        related_user: replacement.original_user?.username || 'another user'
+      });
+    
+    // Create notifications
+    // Notification for original user (User A)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: replacement.original_user_id,
+        title: '✅ Replacement Accepted',
+        message: (replacement.replacement_user?.full_name || replacement.replacement_user?.username) + ' has accepted your replacement request for ' + replacement.day + '.',
+        type: 'replacement',
+        related_id: replacement_id
+      });
+      
+    // Notification for replacement user (User B)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: replacement.replacement_user_id,
+        title: '✅ You Are Now the Replacement',
+        message: 'You have successfully replaced ' + (replacement.original_user?.full_name || replacement.original_user?.username) + ' for ' + replacement.day + '.',
+        type: 'replacement',
+        related_id: replacement_id
+      });
+    
+    res.json({ success: true, message: 'Replacement accepted' });
+  } catch (error) {
+    console.error('Error accepting replacement:', error);
+    res.status(500).json({ error: 'Error accepting replacement' });
+  }
+});
+
+// Decline replacement request
+app.post('/api/booking/decline-replacement', authenticate, async (req, res) => {
+  try {
+    const { replacement_id } = req.body;
+    const userId = req.user.id;
+    
+    // Get the replacement request
+    const { data: replacement, error: getError } = await supabaseAdmin
+      .from('replacements')
+      .select('*')
+      .eq('id', replacement_id)
+      .eq('replacement_user_id', userId)
+      .eq('status', 'pending')
+      .single();
+      
+    if (getError) throw getError;
+    
+    if (!replacement) {
+      return res.status(404).json({ error: 'Replacement request not found' });
+    }
+    
+    // Update replacement status
+    const { error: updateError } = await supabaseAdmin
+      .from('replacements')
+      .update({ status: 'declined', updated_at: new Date() })
+      .eq('id', replacement_id);
+      
+    if (updateError) throw updateError;
+    
+    // Create notification for original user (User A)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: replacement.original_user_id,
+        title: '❌ Replacement Declined',
+        message: (replacement.replacement_user?.full_name || replacement.replacement_user?.username) + ' has declined your replacement request for ' + replacement.day + '.',
+        type: 'replacement',
+        related_id: replacement_id
+      });
+      
+    // Create notification for replacement user (User B)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: replacement.replacement_user_id,
+        title: '📋 Replacement Declined',
+        message: 'You have declined the replacement request for ' + replacement.day + '.',
+        type: 'replacement',
+        related_id: replacement_id
+      });
+    
+    res.json({ success: true, message: 'Replacement declined' });
+  } catch (error) {
+    console.error('Error declining replacement:', error);
+    res.status(500).json({ error: 'Error declining replacement' });
+  }
+});
+
+// Create replacement request
+app.post('/api/booking/request-replacement', authenticate, async (req, res) => {
+  try {
+    const { original_user_id, replacement_user_id, day } = req.body;
+    
+    // Get booking ID for the day
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from('bookings')
+      .select('id')
+      .eq('day', day)
+      .single();
+      
+    if (bookingError) throw bookingError;
+    
+    // Create replacement request
+    const { data: replacement, error: insertError } = await supabaseAdmin
+      .from('replacements')
+      .insert({
+        original_user_id: original_user_id,
+        replacement_user_id: replacement_user_id,
+        booking_id: booking.id,
+        day: day,
+        status: 'pending'
+      })
+      .select(`
+        *,
+        original_user:original_user_id (
+          id,
+          username,
+          full_name
+        ),
+        replacement_user:replacement_user_id (
+          id,
+          username,
+          full_name
+        )
+      `)
+      .single();
+      
+    if (insertError) throw insertError;
+    
+    // Create notification for replacement user (User B)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: replacement_user_id,
+        title: '🔄 Replacement Request',
+        message: (replacement.original_user?.full_name || replacement.original_user?.username) + ' has requested you to replace them for ' + day + '. Please accept or decline.',
+        type: 'replacement',
+        related_id: replacement.id
+      });
+    
+    // Create notification for original user (User A)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: original_user_id,
+        title: '⏳ Replacement Request Sent',
+        message: 'Your replacement request for ' + day + ' has been sent to ' + (replacement.replacement_user?.full_name || replacement.replacement_user?.username) + '. Waiting for response.',
+        type: 'replacement',
+        related_id: replacement.id
+      });
+    
+    res.json({ success: true, data: replacement });
+  } catch (error) {
+    console.error('Error creating replacement request:', error);
+    res.status(500).json({ error: 'Error creating replacement request' });
+  }
+});
