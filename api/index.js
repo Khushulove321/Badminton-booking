@@ -1119,3 +1119,304 @@ app.get('/api/admin/all-users', authenticate, isAdmin, async (req, res) => {
     res.status(500).json({ error: 'Error fetching users' });
   }
 });
+
+// ===== ADMIN ERASE FUNCTIONS =====
+
+// Erase a specific player's data but keep account (admin only)
+app.post('/api/admin/erase-player-data', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    const adminId = req.user.id;
+    
+    if (user_id === adminId) {
+      return res.status(400).json({ error: 'Cannot erase your own data. Use the other options.' });
+    }
+    
+    // Check if user exists
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username')
+      .eq('id', user_id)
+      .single();
+      
+    if (profileError) throw profileError;
+    
+    // Delete ALL data for this user but KEEP the account
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('history')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('penalties')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('replacements')
+      .delete()
+      .or(`original_user_id.eq.${user_id},replacement_user_id.eq.${user_id}`);
+    
+    // Reset any bookings this user was selected for
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        selected_user_id: null,
+        is_booked: false
+      })
+      .eq('selected_user_id', user_id);
+    
+    res.json({ 
+      success: true, 
+      message: `All data for ${profile.username} has been erased. Account retained.`,
+      user: profile.username
+    });
+  } catch (error) {
+    console.error('Error erasing player data:', error);
+    res.status(500).json({ error: 'Error erasing player data' });
+  }
+});
+
+// Erase a specific player (account + data)
+app.post('/api/admin/erase-player', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    const adminId = req.user.id;
+    
+    if (user_id === adminId) {
+      return res.status(400).json({ error: 'Cannot erase yourself. Use the other options.' });
+    }
+    
+    // Check if user exists
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username')
+      .eq('id', user_id)
+      .single();
+      
+    if (profileError) throw profileError;
+    
+    // Delete ALL data for this user
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('history')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('penalties')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('replacements')
+      .delete()
+      .or(`original_user_id.eq.${user_id},replacement_user_id.eq.${user_id}`);
+    
+    // Delete the user profile
+    await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', user_id);
+    
+    // Delete the user from auth
+    await supabaseAdmin.auth.admin.deleteUser(user_id);
+    
+    // Reset any bookings this user was selected for
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        selected_user_id: null,
+        is_booked: false
+      })
+      .eq('selected_user_id', user_id);
+    
+    res.json({ 
+      success: true, 
+      message: `Player ${profile.username} has been completely erased.`,
+      user_deleted: profile.username
+    });
+  } catch (error) {
+    console.error('Error erasing player:', error);
+    res.status(500).json({ error: 'Error erasing player' });
+  }
+});
+
+// Wipe all players' DATA but keep accounts (admin only)
+app.post('/api/admin/wipe-all-data', authenticate, isAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    
+    // Get all users except the admin
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .neq('id', adminId);
+      
+    if (usersError) throw usersError;
+    
+    // Delete all data for each user but KEEP accounts
+    for (let user of users) {
+      await supabaseAdmin
+        .from('availability')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('history')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('penalties')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('replacements')
+        .delete()
+        .or(`original_user_id.eq.${user.id},replacement_user_id.eq.${user.id}`);
+    }
+    
+    // Reset bookings
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        selected_user_id: null,
+        is_booked: false
+      })
+      .neq('id', '');
+    
+    // Reset availability
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .neq('id', '');
+    
+    res.json({ 
+      success: true, 
+      message: 'All player data wiped successfully. Accounts retained.',
+      users_affected: users.length 
+    });
+  } catch (error) {
+    console.error('Error wiping all data:', error);
+    res.status(500).json({ error: 'Error wiping data' });
+  }
+});
+
+// Remove ALL players (accounts + data) except admin (admin only)
+app.post('/api/admin/remove-all-players', authenticate, isAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    
+    // Get all users except the admin
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .neq('id', adminId);
+      
+    if (usersError) throw usersError;
+    
+    // Delete all data and accounts for each user
+    for (let user of users) {
+      await supabaseAdmin
+        .from('availability')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('history')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('penalties')
+        .delete()
+        .eq('user_id', user.id);
+      
+      await supabaseAdmin
+        .from('replacements')
+        .delete()
+        .or(`original_user_id.eq.${user.id},replacement_user_id.eq.${user.id}`);
+      
+      await supabaseAdmin
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+      
+      await supabaseAdmin.auth.admin.deleteUser(user.id);
+    }
+    
+    // Reset bookings
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        selected_user_id: null,
+        is_booked: false
+      })
+      .neq('id', '');
+    
+    // Reset availability
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .neq('id', '');
+    
+    res.json({ 
+      success: true, 
+      message: `All players removed successfully. Admin account kept.`,
+      users_removed: users.length 
+    });
+  } catch (error) {
+    console.error('Error removing all players:', error);
+    res.status(500).json({ error: 'Error removing players' });
+  }
+});
+
+// Get all users for admin erase selection
+app.get('/api/admin/all-users', authenticate, isAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    
+    const { data: users, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username, full_name, is_admin')
+      .neq('id', adminId);
+      
+    if (error) throw error;
+    
+    res.json(users || []);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Error fetching users' });
+  }
+});

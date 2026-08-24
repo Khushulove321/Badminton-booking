@@ -1831,3 +1831,268 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 });
+
+// ===== ADMIN ERASE FUNCTIONS =====
+
+async function loadPlayersForErase(selectId) {
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/all-users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch players');
+    
+    const players = await response.json();
+    const select = document.getElementById(selectId);
+    
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">-- Select a player --</option>';
+    
+    for (let i = 0; i < players.length; i++) {
+      const player = players[i];
+      const name = player.full_name || player.username;
+      const adminTag = player.is_admin ? ' (Admin)' : '';
+      select.innerHTML += `<option value="${player.id}">${name} (@${player.username})${adminTag}</option>`;
+    }
+  } catch (error) {
+    console.error('Error loading players:', error);
+  }
+}
+
+// Erase Player (Account + Data)
+async function erasePlayer() {
+  const select = document.getElementById('playerSelectErase');
+  const playerId = select?.value;
+  
+  if (!playerId) {
+    document.getElementById('erasePlayerError').textContent = 'Please select a player.';
+    document.getElementById('erasePlayerError').style.display = 'block';
+    return;
+  }
+  
+  const playerName = select.options[select.selectedIndex]?.text || 'this player';
+  
+  const confirmed = confirm(`⚠️ DANGER: This will COMPLETELY ERASE ${playerName} (account + all data). This cannot be undone! Are you sure?`);
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm(`⚠️ FINAL WARNING: Are you ABSOLUTELY sure you want to delete ${playerName} permanently?`);
+  if (!doubleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/erase-player`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_id: playerId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to erase player');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    document.getElementById('erasePlayerModal').style.display = 'none';
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error erasing player:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to erase player', 'error');
+  }
+}
+
+// Erase Player Data (Keep Account)
+async function erasePlayerData() {
+  const select = document.getElementById('playerSelectEraseData');
+  const playerId = select?.value;
+  
+  if (!playerId) {
+    document.getElementById('erasePlayerDataError').textContent = 'Please select a player.';
+    document.getElementById('erasePlayerDataError').style.display = 'block';
+    return;
+  }
+  
+  const playerName = select.options[select.selectedIndex]?.text || 'this player';
+  
+  const confirmed = confirm(`⚠️ This will erase ALL data for ${playerName} (history, penalties, notifications, etc.) but KEEP their account. Continue?`);
+  if (!confirmed) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/erase-player-data`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_id: playerId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to erase player data');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    document.getElementById('erasePlayerDataModal').style.display = 'none';
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error erasing player data:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player data';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to erase player data', 'error');
+  }
+}
+
+// Wipe All Player Data (Keep Accounts)
+async function wipeAllPlayerData() {
+  const confirmed = confirm('⚠️ This will erase ALL data for ALL players (history, penalties, notifications, etc.) but KEEP their accounts. Continue?');
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL player data will be permanently deleted. Accounts will be kept. Are you sure?');
+  if (!doubleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/wipe-all-data`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to wipe all data');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error wiping all data:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to wipe all data';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to wipe all data', 'error');
+  }
+}
+
+// Remove ALL Players (Accounts + Data)
+async function removeAllPlayers() {
+  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will REMOVE ALL PLAYERS (accounts + all data) EXCEPT your admin account. This cannot be undone! Are you sure?');
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL players will be permanently deleted. Only your admin account will remain. Are you ABSOLUTELY sure?');
+  if (!doubleConfirm) return;
+  
+  const tripleConfirm = confirm('⚠️ LAST CHANCE: Type "YES" to confirm.');
+  if (!tripleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/remove-all-players`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to remove all players');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error removing all players:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to remove all players';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to remove all players', 'error');
+  }
+}
+
+// Add event listeners for erase buttons
+document.addEventListener('DOMContentLoaded', function() {
+  // ... existing DOMContentLoaded code ...
+  
+  // ERASE BUTTONS
+  const erasePlayerBtn = document.getElementById('erasePlayerBtn');
+  if (erasePlayerBtn) {
+    erasePlayerBtn.addEventListener('click', async function() {
+      await loadPlayersForErase('playerSelectErase');
+      document.getElementById('erasePlayerModal').style.display = 'flex';
+    });
+  }
+  
+  const erasePlayerDataBtn = document.getElementById('erasePlayerDataBtn');
+  if (erasePlayerDataBtn) {
+    erasePlayerDataBtn.addEventListener('click', async function() {
+      await loadPlayersForErase('playerSelectEraseData');
+      document.getElementById('erasePlayerDataModal').style.display = 'flex';
+    });
+  }
+  
+  const wipeAllDataBtn = document.getElementById('wipeAllDataBtn');
+  if (wipeAllDataBtn) {
+    wipeAllDataBtn.addEventListener('click', wipeAllPlayerData);
+  }
+  
+  const removeAllPlayersBtn = document.getElementById('removeAllPlayersBtn');
+  if (removeAllPlayersBtn) {
+    removeAllPlayersBtn.addEventListener('click', removeAllPlayers);
+  }
+  
+  // Close modals
+  const closeErasePlayerModal = document.getElementById('closeErasePlayerModal');
+  if (closeErasePlayerModal) {
+    closeErasePlayerModal.addEventListener('click', function() {
+      document.getElementById('erasePlayerModal').style.display = 'none';
+    });
+  }
+  
+  const closeErasePlayerDataModal = document.getElementById('closeErasePlayerDataModal');
+  if (closeErasePlayerDataModal) {
+    closeErasePlayerDataModal.addEventListener('click', function() {
+      document.getElementById('erasePlayerDataModal').style.display = 'none';
+    });
+  }
+  
+  // Confirm buttons
+  const confirmErasePlayerBtn = document.getElementById('confirmErasePlayerBtn');
+  if (confirmErasePlayerBtn) {
+    confirmErasePlayerBtn.addEventListener('click', erasePlayer);
+  }
+  
+  const confirmErasePlayerDataBtn = document.getElementById('confirmErasePlayerDataBtn');
+  if (confirmErasePlayerDataBtn) {
+    confirmErasePlayerDataBtn.addEventListener('click', erasePlayerData);
+  }
+  
+  // Click outside to close
+  window.addEventListener('click', function(e) {
+    const modal1 = document.getElementById('erasePlayerModal');
+    const modal2 = document.getElementById('erasePlayerDataModal');
+    if (e.target === modal1) modal1.style.display = 'none';
+    if (e.target === modal2) modal2.style.display = 'none';
+  });
+});
