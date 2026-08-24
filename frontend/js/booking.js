@@ -1637,3 +1637,197 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// ===== ADMIN WIPE FUNCTIONS =====
+
+async function wipeAllPlayers() {
+  const token = window.getToken();
+  if (!token) return;
+  
+  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will delete ALL players and their data EXCEPT your admin account. This action CANNOT be undone! Are you sure?');
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm('⚠️ FINAL WARNING: Are you ABSOLUTELY sure? All player data (history, penalties, notifications, availability) will be permanently deleted.');
+  if (!doubleConfirm) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/wipe-all`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to wipe all players');
+    
+    const data = await response.json();
+    document.getElementById('wipeStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('wipeStatus').style.color = '#48bb78';
+    window.showToast('✅ All players wiped successfully!', 'success');
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error wiping all players:', error);
+    document.getElementById('wipeStatus').textContent = '❌ Failed to wipe all players';
+    document.getElementById('wipeStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to wipe players', 'error');
+  }
+}
+
+async function loadPlayersForWipe() {
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/all-users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch players');
+    
+    const players = await response.json();
+    const select = document.getElementById('playerSelect');
+    
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">-- Select a player --</option>';
+    
+    for (let i = 0; i < players.length; i++) {
+      const player = players[i];
+      const name = player.full_name || player.username;
+      const adminTag = player.is_admin ? ' (Admin)' : '';
+      select.innerHTML += `<option value="${player.id}">${name} (@${player.username})${adminTag}</option>`;
+    }
+  } catch (error) {
+    console.error('Error loading players for wipe:', error);
+  }
+}
+
+async function wipeSpecificPlayer() {
+  const select = document.getElementById('playerSelect');
+  const playerId = select?.value;
+  
+  if (!playerId) {
+    document.getElementById('wipePlayerError').textContent = 'Please select a player.';
+    document.getElementById('wipePlayerError').style.display = 'block';
+    return;
+  }
+  
+  const playerName = select.options[select.selectedIndex]?.text || 'this player';
+  
+  const confirmed = confirm(`⚠️ Are you sure you want to wipe ALL data for ${playerName}? This cannot be undone!`);
+  if (!confirmed) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/wipe-player`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_id: playerId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to wipe player');
+    
+    const data = await response.json();
+    document.getElementById('wipeStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('wipeStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    document.getElementById('wipePlayerModal').style.display = 'none';
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error wiping player:', error);
+    document.getElementById('wipeStatus').textContent = '❌ Failed to wipe player';
+    document.getElementById('wipeStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to wipe player', 'error');
+  }
+}
+
+async function wipeSelf() {
+  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will DELETE your admin account and ALL your data. This action CANNOT be undone! You will be logged out permanently.');
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm('⚠️ FINAL WARNING: Are you ABSOLUTELY sure you want to delete your admin account? This is permanent.');
+  if (!doubleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/wipe-self`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to wipe self');
+    
+    const data = await response.json();
+    window.showToast('✅ Admin account wiped. You will be logged out.', 'success');
+    
+    // Clear local storage and redirect
+    localStorage.removeItem('user');
+    localStorage.removeItem('session');
+    localStorage.removeItem('testRunMode');
+    localStorage.removeItem('simulateSunday');
+    
+    setTimeout(() => {
+      window.location.href = '/login.html';
+    }, 2000);
+  } catch (error) {
+    console.error('Error wiping self:', error);
+    window.showToast('❌ Failed to wipe self', 'error');
+  }
+}
+
+// Add event listeners for wipe buttons
+document.addEventListener('DOMContentLoaded', function() {
+  // ... existing DOMContentLoaded code ...
+  
+  // WIPE BUTTONS
+  const wipeAllBtn = document.getElementById('wipeAllBtn');
+  if (wipeAllBtn) {
+    wipeAllBtn.addEventListener('click', wipeAllPlayers);
+  }
+  
+  const wipePlayerBtn = document.getElementById('wipePlayerBtn');
+  if (wipePlayerBtn) {
+    wipePlayerBtn.addEventListener('click', async function() {
+      await loadPlayersForWipe();
+      document.getElementById('wipePlayerModal').style.display = 'flex';
+    });
+  }
+  
+  const wipeSelfBtn = document.getElementById('wipeSelfBtn');
+  if (wipeSelfBtn) {
+    wipeSelfBtn.addEventListener('click', wipeSelf);
+  }
+  
+  const closeWipePlayerModal = document.getElementById('closeWipePlayerModal');
+  if (closeWipePlayerModal) {
+    closeWipePlayerModal.addEventListener('click', function() {
+      document.getElementById('wipePlayerModal').style.display = 'none';
+    });
+  }
+  
+  const confirmWipePlayerBtn = document.getElementById('confirmWipePlayerBtn');
+  if (confirmWipePlayerBtn) {
+    confirmWipePlayerBtn.addEventListener('click', wipeSpecificPlayer);
+  }
+  
+  // Click outside to close
+  window.addEventListener('click', function(e) {
+    const modal = document.getElementById('wipePlayerModal');
+    if (e.target === modal) {
+      modal.style.display = 'none';
+    }
+  });
+});

@@ -891,3 +891,231 @@ app.post('/api/booking/request-replacement', authenticate, async (req, res) => {
     res.status(500).json({ error: 'Error creating replacement request' });
   }
 });
+
+// ===== ADMIN WIPE FUNCTIONS =====
+
+// Wipe all data (admin only)
+app.post('/api/admin/wipe-all', authenticate, isAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    
+    // Get all users except the admin
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .neq('id', adminId);
+      
+    if (usersError) throw usersError;
+    
+    // Delete all data for each user
+    for (let user of users) {
+      // Delete from availability
+      await supabaseAdmin
+        .from('availability')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Delete from history
+      await supabaseAdmin
+        .from('history')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Delete from notifications
+      await supabaseAdmin
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Delete from penalties
+      await supabaseAdmin
+        .from('penalties')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Delete from replacements
+      await supabaseAdmin
+        .from('replacements')
+        .delete()
+        .or(`original_user_id.eq.${user.id},replacement_user_id.eq.${user.id}`);
+      
+      // Delete the user profile
+      await supabaseAdmin
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+      
+      // Delete the user from auth
+      await supabaseAdmin.auth.admin.deleteUser(user.id);
+    }
+    
+    // Reset bookings
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        selected_user_id: null,
+        is_booked: false
+      })
+      .neq('id', '');
+    
+    // Reset availability
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .neq('id', '');
+    
+    res.json({ 
+      success: true, 
+      message: 'All data wiped successfully. Admin account kept.',
+      users_deleted: users.length 
+    });
+  } catch (error) {
+    console.error('Error wiping all data:', error);
+    res.status(500).json({ error: 'Error wiping data' });
+  }
+});
+
+// Wipe a specific player (admin only)
+app.post('/api/admin/wipe-player', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    const adminId = req.user.id;
+    
+    if (user_id === adminId) {
+      return res.status(400).json({ error: 'Cannot wipe self. Use "Wipe Self" instead.' });
+    }
+    
+    // Check if user exists
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username')
+      .eq('id', user_id)
+      .single();
+      
+    if (profileError) throw profileError;
+    
+    // Delete all data for this user
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('history')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('penalties')
+      .delete()
+      .eq('user_id', user_id);
+    
+    await supabaseAdmin
+      .from('replacements')
+      .delete()
+      .or(`original_user_id.eq.${user_id},replacement_user_id.eq.${user_id}`);
+    
+    await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', user_id);
+    
+    await supabaseAdmin.auth.admin.deleteUser(user_id);
+    
+    // Reset any bookings this user was selected for
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        selected_user_id: null,
+        is_booked: false
+      })
+      .eq('selected_user_id', user_id);
+    
+    res.json({ 
+      success: true, 
+      message: `Player ${profile.username} wiped successfully.`,
+      user_deleted: profile.username
+    });
+  } catch (error) {
+    console.error('Error wiping player:', error);
+    res.status(500).json({ error: 'Error wiping player' });
+  }
+});
+
+// Wipe self (admin removing themselves)
+app.post('/api/admin/wipe-self', authenticate, isAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    
+    // Delete all admin's data
+    await supabaseAdmin
+      .from('availability')
+      .delete()
+      .eq('user_id', adminId);
+    
+    await supabaseAdmin
+      .from('history')
+      .delete()
+      .eq('user_id', adminId);
+    
+    await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('user_id', adminId);
+    
+    await supabaseAdmin
+      .from('penalties')
+      .delete()
+      .eq('user_id', adminId);
+    
+    await supabaseAdmin
+      .from('replacements')
+      .delete()
+      .or(`original_user_id.eq.${adminId},replacement_user_id.eq.${adminId}`);
+    
+    // Remove admin status and reset profile
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        username: 'deleted_admin',
+        full_name: 'Deleted Admin',
+        is_admin: false
+      })
+      .eq('id', adminId);
+    
+    // Delete the admin user from auth
+    await supabaseAdmin.auth.admin.deleteUser(adminId);
+    
+    res.json({ 
+      success: true, 
+      message: 'Admin account wiped successfully. You have been logged out.'
+    });
+  } catch (error) {
+    console.error('Error wiping self:', error);
+    res.status(500).json({ error: 'Error wiping self' });
+  }
+});
+
+// Get all users for admin wipe selection
+app.get('/api/admin/all-users', authenticate, isAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    
+    const { data: users, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username, full_name, is_admin')
+      .neq('id', adminId);
+      
+    if (error) throw error;
+    
+    res.json(users || []);
+  } catch (error) {
+    console.error('Error fetching users for wipe:', error);
+    res.status(500).json({ error: 'Error fetching users' });
+  }
+});

@@ -65,6 +65,12 @@
                                 <span id="testRunStatus" style="font-size: 0.9rem; color: #666;"></span>
                                 <span id="testRunType" style="font-size: 0.9rem; font-weight: 600;"></span>
                             </div>
+                            <div id="adminWipeControls" style="display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                                <button id="wipeAllBtn" class="btn btn-danger btn-sm">🗑️ Wipe All Players</button>
+                                <button id="wipePlayerBtn" class="btn btn-warning btn-sm">👤 Wipe Specific Player</button>
+                                <button id="wipeSelfBtn" class="btn btn-dark btn-sm">🚫 Wipe Self</button>
+                                <span id="wipeStatus" style="font-size: 0.9rem; color: #666;"></span>
+                            </div>
                         </div>
                     </div>
 
@@ -125,6 +131,7 @@
             <div id="notificationsView" style="display:none;">
                 <div class="dashboard">
                     <h2>🔔 Notifications</h2>
+                    <div id="pendingReplacements"></div>
                     <div id="notificationsList">Loading notifications...</div>
                 </div>
             </div>
@@ -141,6 +148,20 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- WIPE PLAYER MODAL -->
+    <div id="wipePlayerModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="close-btn" id="closeWipePlayerModal">&times;</button>
+            <h2>👤 Wipe Specific Player</h2>
+            <p>Select a player to wipe all their data:</p>
+            <select id="playerSelect" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin:15px 0;font-size:16px;">
+                <option value="">-- Select a player --</option>
+            </select>
+            <button id="confirmWipePlayerBtn" class="btn btn-danger" style="width:100%;">🗑️ Wipe Player</button>
+            <div id="wipePlayerError" style="color:red;display:none;margin-top:10px;"></div>
         </div>
     </div>
 
@@ -217,5 +238,3 @@
     <script src="/js/history.js"></script>
 </body>
 </html>
-            <!-- Add this inside the notifications view -->
-            <div id="pendingReplacements"></div>
