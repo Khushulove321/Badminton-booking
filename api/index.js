@@ -1420,3 +1420,83 @@ app.get('/api/admin/all-users', authenticate, isAdmin, async (req, res) => {
     res.status(500).json({ error: 'Error fetching users' });
   }
 });
+
+// Get notification details
+app.post('/api/booking/notification-details', authenticate, async (req, res) => {
+  try {
+    const { notification_id } = req.body;
+    const userId = req.user.id;
+    
+    // Get the notification
+    const { data: notification, error: notifError } = await supabaseAdmin
+      .from('notifications')
+      .select('*')
+      .eq('id', notification_id)
+      .eq('user_id', userId)
+      .single();
+      
+    if (notifError) throw notifError;
+    
+    if (!notification) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    
+    const result = {
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      date: notification.created_at,
+      time: notification.created_at,
+      related_id: notification.related_id
+    };
+    
+    // Get additional details based on type
+    if (notification.type === 'penalty') {
+      // Get penalty details
+      const { data: penalty, error: penaltyError } = await supabaseAdmin
+        .from('penalties')
+        .select('*')
+        .eq('id', notification.related_id)
+        .single();
+        
+      if (!penaltyError && penalty) {
+        result.amount = penalty.amount || 10.00;
+        result.penalty_status = penalty.status || 'pending';
+        result.paid_at = penalty.paid_at || null;
+        result.reason = penalty.reason || 'Cancelled after court was booked';
+        result.day = penalty.day || notification.message.match(/for (\w+)/)?.[1] || 'Unknown';
+      }
+    } else if (notification.type === 'replacement') {
+      // Get replacement details
+      const { data: replacement, error: replacementError } = await supabaseAdmin
+        .from('replacements')
+        .select(`
+          *,
+          original_user:original_user_id (username, full_name),
+          replacement_user:replacement_user_id (username, full_name)
+        `)
+        .eq('id', notification.related_id)
+        .single();
+        
+      if (!replacementError && replacement) {
+        result.original_user = replacement.original_user?.full_name || replacement.original_user?.username || 'N/A';
+        result.replacement_user = replacement.replacement_user?.full_name || replacement.replacement_user?.username || 'N/A';
+        result.replacement_status = replacement.status || 'pending';
+        result.approved_at = replacement.updated_at || null;
+        result.day = replacement.day || 'Unknown';
+      }
+    } else if (notification.type === 'info') {
+      // Try to get day from message
+      const dayMatch = notification.message.match(/for (\w+)/);
+      if (dayMatch) {
+        result.day = dayMatch[1];
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching notification details:', error);
+    res.status(500).json({ error: 'Error fetching notification details' });
+  }
+});
