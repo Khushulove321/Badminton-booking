@@ -1,4 +1,4 @@
-// Booking functions - With Notifications
+// Booking functions - With Admin-Only Test Controls
 
 console.log('📚 booking.js loaded');
 
@@ -93,6 +93,7 @@ async function loadNotifications() {
     }
     
     let html = '<h3>🔔 Your Notifications</h3>';
+    html += '<p style="color: #666;margin-bottom:20px;">You have ' + notifications.filter(n => !n.is_read).length + ' unread notification(s).</p>';
     
     for (let i = 0; i < notifications.length; i++) {
       const n = notifications[i];
@@ -102,7 +103,7 @@ async function loadNotifications() {
                         n.type === 'warning' ? '#f6e05e' : '#667eea';
       
       html += `
-        <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor};">
+        <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor}; ${isRead ? 'opacity: 0.7;' : ''}">
           <div class="notification-icon">${n.type === 'penalty' ? '💰' : n.type === 'replacement' ? '🔄' : n.type === 'warning' ? '⚠️' : 'ℹ️'}</div>
           <div class="notification-content">
             <div class="notification-title">${n.title}</div>
@@ -116,7 +117,6 @@ async function loadNotifications() {
     
     container.innerHTML = html;
     
-    // Mark as read buttons
     const markBtns = container.querySelectorAll('.mark-read-btn');
     for (let i = 0; i < markBtns.length; i++) {
       markBtns[i].addEventListener('click', async function() {
@@ -125,7 +125,6 @@ async function loadNotifications() {
       });
     }
     
-    // Update badge
     const unreadCount = notifications.filter(n => !n.is_read).length;
     updateNotificationBadge(unreadCount);
     
@@ -174,6 +173,102 @@ async function updateNotificationBadge(count) {
   }
 }
 
+// ===== PENDING REPLACEMENTS =====
+async function getPendingReplacements() {
+  const token = window.getToken();
+  if (!token) return [];
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/pending-replacements`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch pending replacements');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching pending replacements:', error);
+    return [];
+  }
+}
+
+async function acceptReplacement(replacementId) {
+  const token = window.getToken();
+  if (!token) return false;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/accept-replacement`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ replacement_id: replacementId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to accept replacement');
+    window.showToast('✅ Replacement accepted!', 'success');
+    return true;
+  } catch (error) {
+    console.error('Error accepting replacement:', error);
+    window.showToast('❌ Failed to accept replacement', 'error');
+    return false;
+  }
+}
+
+async function declineReplacement(replacementId) {
+  const token = window.getToken();
+  if (!token) return false;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/decline-replacement`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ replacement_id: replacementId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to decline replacement');
+    window.showToast('✅ Replacement declined', 'success');
+    return true;
+  } catch (error) {
+    console.error('Error declining replacement:', error);
+    window.showToast('❌ Failed to decline replacement', 'error');
+    return false;
+  }
+}
+
+async function requestReplacement(originalUserId, replacementUserId, day) {
+  const token = window.getToken();
+  if (!token) return false;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/request-replacement`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        original_user_id: originalUserId,
+        replacement_user_id: replacementUserId,
+        day: day
+      })
+    });
+    
+    if (!response.ok) throw new Error('Failed to request replacement');
+    window.showToast('✅ Replacement request sent!', 'success');
+    return true;
+  } catch (error) {
+    console.error('Error requesting replacement:', error);
+    window.showToast('❌ Failed to request replacement', 'error');
+    return false;
+  }
+}
+
 // ===== HISTORY RECORDING FUNCTION =====
 async function recordHistory(event_date, action_type, day, description, amount = 0, related_user = null) {
   const token = window.getToken();
@@ -205,11 +300,11 @@ async function recordHistory(event_date, action_type, day, description, amount =
   }
 }
 
-// ===== TEST RUN MODE =====
+// ===== TEST RUN MODE (ADMIN ONLY) =====
 let testRunMode = false;
 let testRunDay = 1;
 
-// Sample users for simulation
+// Sample users for simulation (only used when admin uses Test Run)
 const SAMPLE_USERS = [
     { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
     { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
@@ -239,6 +334,12 @@ function getSimulatedNextWeekBookers() {
 }
 
 function toggleTestRun() {
+    // Check if user is admin
+    if (!isAdmin) {
+        window.showToast('❌ Admin access required', 'error');
+        return;
+    }
+    
     const wasActive = testRunMode;
     if (wasActive) {
         testRunMode = false;
@@ -266,6 +367,12 @@ function toggleTestRun() {
 }
 
 function simulateSunday() {
+    // Check if user is admin
+    if (!isAdmin) {
+        window.showToast('❌ Admin access required', 'error');
+        return;
+    }
+    
     testRunMode = true;
     localStorage.setItem('testRunMode', 'true');
     localStorage.setItem('simulateSunday', 'true');
@@ -275,58 +382,66 @@ function simulateSunday() {
     document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
     document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
     if (document.getElementById('testRunType')) {
-        document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers';
+        document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers (ADMIN ONLY)';
         document.getElementById('testRunType').style.color = '#f56565';
     }
     window.showToast('🧪 Sunday Simulation activated - Showing simulated court bookers!', 'success');
     renderDashboard();
 }
 
-function disableSimulation() {
-    testRunMode = false;
-    localStorage.removeItem('testRunMode');
-    localStorage.removeItem('simulateSunday');
-    document.getElementById('testRunStatus').textContent = '';
-    document.getElementById('testRunStatus').style.color = '#666';
-    document.getElementById('testRunBtn').textContent = '🧪 Test Run';
-    document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
-    if (document.getElementById('testRunType')) {
-        document.getElementById('testRunType').textContent = '';
+// ===== DATE FUNCTIONS =====
+function getNextWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    let daysUntilNextMonday;
+    if (currentDay === 0) {
+        daysUntilNextMonday = 1;
+    } else if (currentDay === 1) {
+        daysUntilNextMonday = 7;
+    } else {
+        daysUntilNextMonday = 8 - currentDay;
     }
-    renderDashboard();
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(nextMonday);
+        date.setDate(nextMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    if (localStorage.getItem('testRunMode') === 'true') {
-        testRunMode = true;
-        testRunDay = 1;
-        const statusEl = document.getElementById('testRunStatus');
-        const btn = document.getElementById('testRunBtn');
-        const isSunday = localStorage.getItem('simulateSunday') === 'true';
-        if (statusEl) {
-            if (isSunday) {
-                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
-                statusEl.style.color = '#f56565';
-            } else {
-                statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
-                statusEl.style.color = '#f59e0b';
-            }
-        }
-        if (btn) {
-            btn.textContent = '🔴 Disable Test Run';
-            btn.className = 'btn btn-danger btn-sm';
-        }
-        if (isSunday && document.getElementById('testRunType')) {
-            document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers';
-            document.getElementById('testRunType').style.color = '#f56565';
-        }
+function getThisWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysToMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(thisMonday);
+        date.setDate(thisMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
     }
-});
+    return weekDates;
+}
 
 function isSelectionWindowOpen() {
     const now = new Date();
     let day = now.getDay();
     
+    // Only admin can use test mode
     if (testRunMode) {
         const isSunday = localStorage.getItem('simulateSunday') === 'true';
         if (isSunday) {
@@ -343,18 +458,19 @@ function getSelectionStatus() {
     const day = now.getDay();
     const isSunday = localStorage.getItem('simulateSunday') === 'true';
     
-    if (testRunMode && isSunday) {
+    // Only show test run status to admin
+    if (testRunMode && isSunday && isAdmin) {
         return {
             status: 'sunday',
-            message: '🧪 TEST RUN: Simulating Sunday - FINAL COURT BOOKERS',
+            message: '🧪 TEST RUN: Simulating Sunday - FINAL COURT BOOKERS (ADMIN ONLY)',
             className: 'sunday'
         };
     }
     
-    if (testRunMode) {
+    if (testRunMode && isAdmin) {
         return {
             status: 'open',
-            message: '🧪 TEST RUN: Simulating Monday - Selection OPEN',
+            message: '🧪 TEST RUN: Simulating Monday - Selection OPEN (ADMIN ONLY)',
             className: 'open'
         };
     }
@@ -411,7 +527,7 @@ const RULES_DATA = [
         category: '🔄 Replacement Rules',
         rules: [
             'You can find a replacement from any registered user',
-            'The replacement must be approved by the admin',
+                       'The replacement must approve the request',
             'The replacement takes full responsibility for the booking',
             'If no replacement is found, you must pay the penalty'
         ]
@@ -465,16 +581,12 @@ function switchView(view) {
     document.getElementById('dashboardView').style.display = view === 'dashboard' ? 'block' : 'none';
     document.getElementById('rulesView').style.display = view === 'rules' ? 'block' : 'none';
     document.getElementById('notificationsView').style.display = view === 'notifications' ? 'block' : 'none';
-    document.getElementById('historyView').style.display = view === 'history' ? 'block' : 'none';
+    document.getElementById('historyView').style.display = 'none';
     
     if (view === 'rules') renderRulesPage();
     if (view === 'notifications') {
         loadNotifications();
-    }
-    if (view === 'history') {
-        if (typeof initHistoryPage === 'function') {
-            initHistoryPage();
-        }
+        loadPendingReplacements();
     }
     closeSidePanel();
 }
@@ -499,134 +611,92 @@ function renderRulesPage() {
     container.innerHTML = html;
 }
 
-// ============ HISTORY PAGE ============
-async function renderHistoryPage() {
-    const container = document.getElementById('historyList');
+// ============ PENDING REPLACEMENTS IN NOTIFICATIONS ============
+async function loadPendingReplacements() {
+    const container = document.getElementById('pendingReplacements');
     if (!container) return;
-    container.innerHTML = 'Loading history...';
+    
+    const token = window.getToken();
+    if (!token) {
+        container.innerHTML = '';
+        return;
+    }
     
     try {
-        const token = window.getToken();
-        if (!token) {
-            container.innerHTML = '<p style="color: #888;">Please login to view history.</p>';
+        const replacements = await getPendingReplacements();
+        
+        if (!replacements || replacements.length === 0) {
+            container.innerHTML = '';
             return;
         }
         
-        const response = await fetch(window.API_URL + '/booking/my-history', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
+        let html = '<div class="pending-replacements-section"><h3>🔄 Pending Replacement Requests</h3>';
         
-        if (!response.ok) {
-            container.innerHTML = '<p style="color: #888;">No history found.</p>';
-            return;
+        for (let i = 0; i < replacements.length; i++) {
+            const r = replacements[i];
+            const originalName = r.original_user?.full_name || r.original_user?.username || 'Someone';
+            const day = r.day;
+            
+            html += `
+                <div class="replacement-request-card">
+                    <div class="request-info">
+                        <strong>${originalName}</strong> wants you to replace them for <strong>${day}</strong>
+                    </div>
+                    <div class="request-actions">
+                        <button class="btn btn-success btn-sm accept-replacement" data-id="${r.id}">✅ Accept</button>
+                        <button class="btn btn-danger btn-sm decline-replacement" data-id="${r.id}">❌ Decline</button>
+                    </div>
+                </div>
+            `;
         }
         
-        const history = await response.json();
-        
-        if (!history || history.length === 0) {
-            container.innerHTML = '<p style="color: #888;">📜 No history yet. Start playing!</p>';
-            return;
-        }
-        
-        let html = '<h3>📜 Your Booking History</h3>';
-        html += '<p style="color: #666;margin-bottom:20px;">Showing your last 50 records.</p>';
-        
-        const grouped = {};
-        for (let i = 0; i < history.length; i++) {
-            const item = history[i];
-            const date = new Date(item.event_date);
-            const key = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(item);
-        }
-        
-        const keys = Object.keys(grouped);
-        for (let k = 0; k < keys.length; k++) {
-            const monthKey = keys[k];
-            html += '<div style="margin-top:20px;">';
-            html += '<h4 style="color:#2d3748;border-bottom:2px solid #667eea;padding-bottom:5px;">' + monthKey + '</h4>';
-            for (let i = 0; i < grouped[monthKey].length; i++) {
-                const item = grouped[monthKey][i];
-                const statusIcon = item.action_type === 'played' ? '🟢' : 
-                                  item.action_type === 'replacement' ? '🟠' : 
-                                  item.action_type === 'penalty_received' ? '🟡' : 
-                                  item.action_type === 'penalty_paid' ? '🔴' : '⚪';
-                const statusText = item.action_type === 'played' ? 'Played' : 
-                                  item.action_type === 'replacement' ? 'Replacement' : 
-                                  item.action_type === 'penalty_received' ? 'Penalty Received' : 
-                                  item.action_type === 'penalty_paid' ? 'Penalty Paid' : 'Unknown';
-                html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;">';
-                html += '<span>' + statusIcon + ' ' + item.day + ' - ' + new Date(item.event_date).toLocaleDateString() + '</span>';
-                html += '<span style="color:' + (item.action_type === 'played' ? '#48bb78' : item.action_type === 'replacement' ? '#ed8936' : item.action_type === 'penalty_received' ? '#f6e05e' : '#fc8181') + ';">' + statusText + '</span>';
-                html += '</div>';
-            }
-            html += '</div>';
-        }
-        
+        html += '</div>';
         container.innerHTML = html;
+        
+        const acceptBtns = container.querySelectorAll('.accept-replacement');
+        for (let i = 0; i < acceptBtns.length; i++) {
+            acceptBtns[i].addEventListener('click', async function() {
+                const id = this.dataset.id;
+                if (confirm('Are you sure you want to accept this replacement request?')) {
+                    const success = await acceptReplacement(id);
+                    if (success) {
+                        await loadPendingReplacements();
+                        await loadNotifications();
+                        await renderDashboard();
+                    }
+                }
+            });
+        }
+        
+        const declineBtns = container.querySelectorAll('.decline-replacement');
+        for (let i = 0; i < declineBtns.length; i++) {
+            declineBtns[i].addEventListener('click', async function() {
+                const id = this.dataset.id;
+                if (confirm('Are you sure you want to decline this replacement request?')) {
+                    const success = await declineReplacement(id);
+                    if (success) {
+                        await loadPendingReplacements();
+                        await loadNotifications();
+                        await renderDashboard();
+                    }
+                }
+            });
+        }
+        
     } catch (error) {
-        console.error('Error loading history:', error);
-        container.innerHTML = '<p style="color: red;">Failed to load history.</p>';
+        console.error('Error loading pending replacements:', error);
     }
 }
-
-// ============ NOTIFICATIONS PAGE ============
-// (Now handled by loadNotifications function above)
 
 // ============ DASHBOARD FUNCTIONS ============
-function getNextWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    let daysUntilNextMonday;
-    if (currentDay === 0) {
-        daysUntilNextMonday = 1;
-    } else if (currentDay === 1) {
-        daysUntilNextMonday = 7;
-    } else {
-        daysUntilNextMonday = 8 - currentDay;
-    }
-    const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(nextMonday);
-        date.setDate(nextMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
-    }
-    return weekDates;
-}
-
-function getThisWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const thisMonday = new Date(today);
-    thisMonday.setDate(today.getDate() - daysToMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(thisMonday);
-        date.setDate(thisMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
-    }
-    return weekDates;
-}
-
 async function getAvailability(weekType) {
     const token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(window.API_URL + '/booking/availability?week=' + weekType, {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/availability?week=${weekType}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) throw new Error('Failed to fetch availability');
         return await response.json();
@@ -647,10 +717,10 @@ async function toggleAvailability(day, date) {
         return;
     }
     try {
-        const response = await fetch(window.API_URL + '/booking/select/' + day, {
+        const response = await fetch(`${window.API_URL}/booking/select/${day}`, {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer ' + token,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ date: date })
@@ -684,8 +754,10 @@ async function getMyAvailability() {
     const token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(window.API_URL + '/booking/my-availability', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/my-availability`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) throw new Error('Failed to fetch your availability');
         return await response.json();
@@ -699,8 +771,10 @@ async function getAllUsers() {
     const token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(window.API_URL + '/booking/all-users', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/all-users`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) throw new Error('Failed to fetch users');
         return await response.json();
@@ -714,8 +788,10 @@ async function getThisWeekBookers() {
     const token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(window.API_URL + '/booking/this-week-bookers', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/this-week-bookers`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) throw new Error('Failed to fetch this week bookers');
         return await response.json();
@@ -729,8 +805,10 @@ async function getNextWeekSelected() {
     const token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(window.API_URL + '/booking/selected-players', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/selected-players`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) throw new Error('Failed to fetch selected players');
         return await response.json();
@@ -744,8 +822,10 @@ async function getAvailableUsersForDay(day) {
     const token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(window.API_URL + '/booking/availability?week=next', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) return [];
         const data = await response.json();
@@ -761,10 +841,10 @@ async function removeUserFromBooking(day, userId) {
     const token = window.getToken();
     if (!token) return false;
     try {
-        const response = await fetch(window.API_URL + '/booking/select/' + day, {
+        const response = await fetch(`${window.API_URL}/booking/select/${day}`, {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer ' + token,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ user_id: userId, action: 'remove' })
@@ -781,10 +861,10 @@ async function addReplacement(originalUserId, replacementUserId, day) {
     const token = window.getToken();
     if (!token) return false;
     try {
-        const response = await fetch(window.API_URL + '/booking/replace', {
+        const response = await fetch(`${window.API_URL}/booking/replace`, {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer ' + token,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
@@ -805,10 +885,10 @@ async function recordPenalty(userId, bookingId) {
     const token = window.getToken();
     if (!token) return false;
     try {
-        const response = await fetch(window.API_URL + '/booking/penalty', {
+        const response = await fetch(`${window.API_URL}/booking/penalty`, {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer ' + token,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
@@ -921,6 +1001,7 @@ async function renderTwoWeekTable(isAdminUser) {
     const nextWeekDates = getNextWeekDates();
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
+    // Only show Sunday simulation indicator to admins
     if (isSunday && isTestRun && isAdminUser) {
         document.getElementById('sundayIndicator').style.display = 'inline';
     } else {
@@ -938,6 +1019,7 @@ async function renderTwoWeekTable(isAdminUser) {
         nextWeekSelected = await getNextWeekSelected();
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
+    // Only generate simulated data for admin test run
     if (isSunday && isTestRun && isAdminUser) {
         const simulatedThisWeek = getSimulatedThisWeekBookers();
         const simulatedNextWeek = getSimulatedNextWeekBookers();
@@ -983,7 +1065,7 @@ async function renderTwoWeekTable(isAdminUser) {
             if (isSunday && isTestRun) {
                 html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first.</td></tr>';
             } else {
-                html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Click "Simulate Sunday" to see a preview.</td></tr>';
+                html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Use Test Run to see a preview (Admin only).</td></tr>';
             }
         } else {
             html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 The court bookers are updated every Sunday and remain visible for the entire week.</td></tr>';
@@ -1051,10 +1133,22 @@ async function renderDashboard() {
         if (warningBanner) {
             warningBanner.style.display = canEditBool ? 'none' : 'block';
         }
+        
+        // Admin controls - only shown if user is admin
         const adminControls = document.getElementById('adminControls');
         if (adminControls) {
-            adminControls.style.display = isAdmin ? 'block' : 'none';
+            if (isAdmin) {
+                adminControls.style.display = 'block';
+                // Show test buttons
+                const testControls = document.getElementById('adminTestControls');
+                if (testControls) testControls.style.display = 'flex';
+                const eraseControls = document.getElementById('adminEraseControls');
+                if (eraseControls) eraseControls.style.display = 'flex';
+            } else {
+                adminControls.style.display = 'none';
+            }
         }
+        
         const panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
             panelAdmin.style.display = isAdmin ? 'block' : 'none';
@@ -1120,8 +1214,10 @@ async function checkNotifications() {
     try {
         const token = window.getToken();
         if (!token) return;
-        const response = await fetch(window.API_URL + '/booking/my-penalties', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const response = await fetch(`${window.API_URL}/booking/my-penalties`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         if (!response.ok) return;
         const penalties = await response.json();
@@ -1254,43 +1350,26 @@ async function openReplacementModal(day) {
         
         const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
         if (confirmed) {
-          const success = await addReplacement(currentUser.id, selectedUserId, day);
+          const success = await requestReplacement(currentUser.id, selectedUserId, day);
           if (success) {
             const today = new Date();
             const dateStr = today.toISOString().split('T')[0];
             
-            // Record history for replacement
             await recordHistory(
                 dateStr,
                 'replacement',
                 day,
-                'Replaced ' + currentUser.username + ' with ' + selectedUsername,
+                'Requested replacement with ' + selectedUsername + ' for ' + day,
                 0,
                 selectedUsername
             );
             
-            // Send notification to the original user (User A)
-            await createNotification(
-                currentUser.id,
-                '🔄 Replacement Confirmed',
-                'You have been replaced by ' + selectedFullName + ' for ' + day + '.',
-                'replacement'
-            );
-            
-            // Send notification to the replacement user (User B)
-            await createNotification(
-                selectedUserId,
-                '🔄 You\'ve Been Added as a Replacement',
-                'You have been added as a replacement for ' + day + ' by ' + currentUser.username + '.',
-                'replacement'
-            );
-            
-            window.showToast('✅ ' + selectedUsername + ' has been added as your replacement.', 'success');
+            window.showToast('✅ Replacement request sent to ' + selectedUsername + '!', 'success');
             document.getElementById('replacementModal').style.display = 'none';
             await renderDashboard();
             await updateNotificationBadge();
           } else {
-            window.showToast('❌ Failed to add replacement. Please try again.', 'error');
+            window.showToast('❌ Failed to request replacement. Please try again.', 'error');
           }
         }
       });
@@ -1351,7 +1430,6 @@ async function handleOptOut(day, bookingId, action) {
                 10.00
             );
             
-            // Send notification to the user
             await createNotification(
                 user.id,
                 '💰 Penalty Recorded',
@@ -1392,7 +1470,6 @@ async function handlePenaltyPay(bookingId, day) {
                 10.00
             );
             
-            // Send notification to the user
             await createNotification(
                 user.id,
                 '✅ Penalty Paid',
@@ -1405,12 +1482,206 @@ async function handlePenaltyPay(bookingId, day) {
             window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
             document.getElementById('penaltyModal').style.display = 'none';
             await renderDashboard();
-            await renderNotificationsPage();
+            await loadNotifications();
             await updateNotificationBadge();
         } else {
             window.showToast('❌ Failed to process penalty. Please try again.', 'error');
         }
     }
+}
+
+// ============ ADMIN ERASE FUNCTIONS ============
+async function loadPlayersForErase(selectId) {
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/all-users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch players');
+    
+    const players = await response.json();
+    const select = document.getElementById(selectId);
+    
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">-- Select a player --</option>';
+    
+    for (let i = 0; i < players.length; i++) {
+      const player = players[i];
+      const name = player.full_name || player.username;
+      const adminTag = player.is_admin ? ' (Admin)' : '';
+      select.innerHTML += `<option value="${player.id}">${name} (@${player.username})${adminTag}</option>`;
+    }
+  } catch (error) {
+    console.error('Error loading players:', error);
+  }
+}
+
+async function erasePlayer() {
+  const select = document.getElementById('playerSelectErase');
+  const playerId = select?.value;
+  
+  if (!playerId) {
+    document.getElementById('erasePlayerError').textContent = 'Please select a player.';
+    document.getElementById('erasePlayerError').style.display = 'block';
+    return;
+  }
+  
+  const playerName = select.options[select.selectedIndex]?.text || 'this player';
+  
+  const confirmed = confirm(`⚠️ DANGER: This will COMPLETELY ERASE ${playerName} (account + all data). This cannot be undone! Are you sure?`);
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm(`⚠️ FINAL WARNING: Are you ABSOLUTELY sure you want to delete ${playerName} permanently?`);
+  if (!doubleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/erase-player`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_id: playerId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to erase player');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    document.getElementById('erasePlayerModal').style.display = 'none';
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error erasing player:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to erase player', 'error');
+  }
+}
+
+async function erasePlayerData() {
+  const select = document.getElementById('playerSelectEraseData');
+  const playerId = select?.value;
+  
+  if (!playerId) {
+    document.getElementById('erasePlayerDataError').textContent = 'Please select a player.';
+    document.getElementById('erasePlayerDataError').style.display = 'block';
+    return;
+  }
+  
+  const playerName = select.options[select.selectedIndex]?.text || 'this player';
+  
+  const confirmed = confirm(`⚠️ This will erase ALL data for ${playerName} (history, penalties, notifications, etc.) but KEEP their account. Continue?`);
+  if (!confirmed) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/erase-player-data`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_id: playerId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to erase player data');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    document.getElementById('erasePlayerDataModal').style.display = 'none';
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error erasing player data:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player data';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to erase player data', 'error');
+  }
+}
+
+async function wipeAllPlayerData() {
+  const confirmed = confirm('⚠️ This will erase ALL data for ALL players (history, penalties, notifications, etc.) but KEEP their accounts. Continue?');
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL player data will be permanently deleted. Accounts will be kept. Are you sure?');
+  if (!doubleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/wipe-all-data`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to wipe all data');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error wiping all data:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to wipe all data';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to wipe all data', 'error');
+  }
+}
+
+async function removeAllPlayers() {
+  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will REMOVE ALL PLAYERS (accounts + all data) EXCEPT your admin account. This cannot be undone! Are you sure?');
+  if (!confirmed) return;
+  
+  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL players will be permanently deleted. Only your admin account will remain. Are you ABSOLUTELY sure?');
+  if (!doubleConfirm) return;
+  
+  const tripleConfirm = confirm('⚠️ LAST CHANCE: Type "YES" to confirm.');
+  if (!tripleConfirm) return;
+  
+  const token = window.getToken();
+  if (!token) return;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/admin/remove-all-players`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to remove all players');
+    
+    const data = await response.json();
+    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
+    document.getElementById('eraseStatus').style.color = '#48bb78';
+    window.showToast(`✅ ${data.message}`, 'success');
+    await renderDashboard();
+  } catch (error) {
+    console.error('Error removing all players:', error);
+    document.getElementById('eraseStatus').textContent = '❌ Failed to remove all players';
+    document.getElementById('eraseStatus').style.color = '#f56565';
+    window.showToast('❌ Failed to remove all players', 'error');
+  }
 }
 
 // ============ ADMIN PANEL ============
@@ -1548,7 +1819,7 @@ document.addEventListener('DOMContentLoaded', function() {
             switchView('notifications');
         });
         document.getElementById('panelHistory').addEventListener('click', function() {
-            switchView('history');
+            switchView('notifications');
         });
         const panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
@@ -1621,7 +1892,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.logoutUser();
         });
         
-        // TEST RUN BUTTONS
+        // TEST RUN BUTTONS (only shown to admins via CSS)
         const testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
@@ -1635,464 +1906,64 @@ document.addEventListener('DOMContentLoaded', function() {
                 simulateSunday();
             });
         }
+        
+        // ERASE BUTTONS (only shown to admins via CSS)
+        const erasePlayerBtn = document.getElementById('erasePlayerBtn');
+        if (erasePlayerBtn) {
+            erasePlayerBtn.addEventListener('click', async function() {
+                await loadPlayersForErase('playerSelectErase');
+                document.getElementById('erasePlayerModal').style.display = 'flex';
+            });
+        }
+        
+        const erasePlayerDataBtn = document.getElementById('erasePlayerDataBtn');
+        if (erasePlayerDataBtn) {
+            erasePlayerDataBtn.addEventListener('click', async function() {
+                await loadPlayersForErase('playerSelectEraseData');
+                document.getElementById('erasePlayerDataModal').style.display = 'flex';
+            });
+        }
+        
+        const wipeAllDataBtn = document.getElementById('wipeAllDataBtn');
+        if (wipeAllDataBtn) {
+            wipeAllDataBtn.addEventListener('click', wipeAllPlayerData);
+        }
+        
+        const removeAllPlayersBtn = document.getElementById('removeAllPlayersBtn');
+        if (removeAllPlayersBtn) {
+            removeAllPlayersBtn.addEventListener('click', removeAllPlayers);
+        }
+        
+        // Close modals
+        const closeErasePlayerModal = document.getElementById('closeErasePlayerModal');
+        if (closeErasePlayerModal) {
+            closeErasePlayerModal.addEventListener('click', function() {
+                document.getElementById('erasePlayerModal').style.display = 'none';
+            });
+        }
+        
+        const closeErasePlayerDataModal = document.getElementById('closeErasePlayerDataModal');
+        if (closeErasePlayerDataModal) {
+            closeErasePlayerDataModal.addEventListener('click', function() {
+                document.getElementById('erasePlayerDataModal').style.display = 'none';
+            });
+        }
+        
+        const confirmErasePlayerBtn = document.getElementById('confirmErasePlayerBtn');
+        if (confirmErasePlayerBtn) {
+            confirmErasePlayerBtn.addEventListener('click', erasePlayer);
+        }
+        
+        const confirmErasePlayerDataBtn = document.getElementById('confirmErasePlayerDataBtn');
+        if (confirmErasePlayerDataBtn) {
+            confirmErasePlayerDataBtn.addEventListener('click', erasePlayerData);
+        }
+        
+        window.addEventListener('click', function(e) {
+            const modal1 = document.getElementById('erasePlayerModal');
+            const modal2 = document.getElementById('erasePlayerDataModal');
+            if (e.target === modal1) modal1.style.display = 'none';
+            if (e.target === modal2) modal2.style.display = 'none';
+        });
     }
-});
-
-// ===== ADMIN WIPE FUNCTIONS =====
-
-async function wipeAllPlayers() {
-  const token = window.getToken();
-  if (!token) return;
-  
-  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will delete ALL players and their data EXCEPT your admin account. This action CANNOT be undone! Are you sure?');
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm('⚠️ FINAL WARNING: Are you ABSOLUTELY sure? All player data (history, penalties, notifications, availability) will be permanently deleted.');
-  if (!doubleConfirm) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/wipe-all`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to wipe all players');
-    
-    const data = await response.json();
-    document.getElementById('wipeStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('wipeStatus').style.color = '#48bb78';
-    window.showToast('✅ All players wiped successfully!', 'success');
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error wiping all players:', error);
-    document.getElementById('wipeStatus').textContent = '❌ Failed to wipe all players';
-    document.getElementById('wipeStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to wipe players', 'error');
-  }
-}
-
-async function loadPlayersForWipe() {
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/all-users`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch players');
-    
-    const players = await response.json();
-    const select = document.getElementById('playerSelect');
-    
-    if (!select) return;
-    
-    select.innerHTML = '<option value="">-- Select a player --</option>';
-    
-    for (let i = 0; i < players.length; i++) {
-      const player = players[i];
-      const name = player.full_name || player.username;
-      const adminTag = player.is_admin ? ' (Admin)' : '';
-      select.innerHTML += `<option value="${player.id}">${name} (@${player.username})${adminTag}</option>`;
-    }
-  } catch (error) {
-    console.error('Error loading players for wipe:', error);
-  }
-}
-
-async function wipeSpecificPlayer() {
-  const select = document.getElementById('playerSelect');
-  const playerId = select?.value;
-  
-  if (!playerId) {
-    document.getElementById('wipePlayerError').textContent = 'Please select a player.';
-    document.getElementById('wipePlayerError').style.display = 'block';
-    return;
-  }
-  
-  const playerName = select.options[select.selectedIndex]?.text || 'this player';
-  
-  const confirmed = confirm(`⚠️ Are you sure you want to wipe ALL data for ${playerName}? This cannot be undone!`);
-  if (!confirmed) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/wipe-player`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: playerId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to wipe player');
-    
-    const data = await response.json();
-    document.getElementById('wipeStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('wipeStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    document.getElementById('wipePlayerModal').style.display = 'none';
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error wiping player:', error);
-    document.getElementById('wipeStatus').textContent = '❌ Failed to wipe player';
-    document.getElementById('wipeStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to wipe player', 'error');
-  }
-}
-
-async function wipeSelf() {
-  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will DELETE your admin account and ALL your data. This action CANNOT be undone! You will be logged out permanently.');
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm('⚠️ FINAL WARNING: Are you ABSOLUTELY sure you want to delete your admin account? This is permanent.');
-  if (!doubleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/wipe-self`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to wipe self');
-    
-    const data = await response.json();
-    window.showToast('✅ Admin account wiped. You will be logged out.', 'success');
-    
-    // Clear local storage and redirect
-    localStorage.removeItem('user');
-    localStorage.removeItem('session');
-    localStorage.removeItem('testRunMode');
-    localStorage.removeItem('simulateSunday');
-    
-    setTimeout(() => {
-      window.location.href = '/login.html';
-    }, 2000);
-  } catch (error) {
-    console.error('Error wiping self:', error);
-    window.showToast('❌ Failed to wipe self', 'error');
-  }
-}
-
-// Add event listeners for wipe buttons
-document.addEventListener('DOMContentLoaded', function() {
-  // ... existing DOMContentLoaded code ...
-  
-  // WIPE BUTTONS
-  const wipeAllBtn = document.getElementById('wipeAllBtn');
-  if (wipeAllBtn) {
-    wipeAllBtn.addEventListener('click', wipeAllPlayers);
-  }
-  
-  const wipePlayerBtn = document.getElementById('wipePlayerBtn');
-  if (wipePlayerBtn) {
-    wipePlayerBtn.addEventListener('click', async function() {
-      await loadPlayersForWipe();
-      document.getElementById('wipePlayerModal').style.display = 'flex';
-    });
-  }
-  
-  const wipeSelfBtn = document.getElementById('wipeSelfBtn');
-  if (wipeSelfBtn) {
-    wipeSelfBtn.addEventListener('click', wipeSelf);
-  }
-  
-  const closeWipePlayerModal = document.getElementById('closeWipePlayerModal');
-  if (closeWipePlayerModal) {
-    closeWipePlayerModal.addEventListener('click', function() {
-      document.getElementById('wipePlayerModal').style.display = 'none';
-    });
-  }
-  
-  const confirmWipePlayerBtn = document.getElementById('confirmWipePlayerBtn');
-  if (confirmWipePlayerBtn) {
-    confirmWipePlayerBtn.addEventListener('click', wipeSpecificPlayer);
-  }
-  
-  // Click outside to close
-  window.addEventListener('click', function(e) {
-    const modal = document.getElementById('wipePlayerModal');
-    if (e.target === modal) {
-      modal.style.display = 'none';
-    }
-  });
-});
-
-// ===== ADMIN ERASE FUNCTIONS =====
-
-async function loadPlayersForErase(selectId) {
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/all-users`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch players');
-    
-    const players = await response.json();
-    const select = document.getElementById(selectId);
-    
-    if (!select) return;
-    
-    select.innerHTML = '<option value="">-- Select a player --</option>';
-    
-    for (let i = 0; i < players.length; i++) {
-      const player = players[i];
-      const name = player.full_name || player.username;
-      const adminTag = player.is_admin ? ' (Admin)' : '';
-      select.innerHTML += `<option value="${player.id}">${name} (@${player.username})${adminTag}</option>`;
-    }
-  } catch (error) {
-    console.error('Error loading players:', error);
-  }
-}
-
-// Erase Player (Account + Data)
-async function erasePlayer() {
-  const select = document.getElementById('playerSelectErase');
-  const playerId = select?.value;
-  
-  if (!playerId) {
-    document.getElementById('erasePlayerError').textContent = 'Please select a player.';
-    document.getElementById('erasePlayerError').style.display = 'block';
-    return;
-  }
-  
-  const playerName = select.options[select.selectedIndex]?.text || 'this player';
-  
-  const confirmed = confirm(`⚠️ DANGER: This will COMPLETELY ERASE ${playerName} (account + all data). This cannot be undone! Are you sure?`);
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm(`⚠️ FINAL WARNING: Are you ABSOLUTELY sure you want to delete ${playerName} permanently?`);
-  if (!doubleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/erase-player`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: playerId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to erase player');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    document.getElementById('erasePlayerModal').style.display = 'none';
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error erasing player:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to erase player', 'error');
-  }
-}
-
-// Erase Player Data (Keep Account)
-async function erasePlayerData() {
-  const select = document.getElementById('playerSelectEraseData');
-  const playerId = select?.value;
-  
-  if (!playerId) {
-    document.getElementById('erasePlayerDataError').textContent = 'Please select a player.';
-    document.getElementById('erasePlayerDataError').style.display = 'block';
-    return;
-  }
-  
-  const playerName = select.options[select.selectedIndex]?.text || 'this player';
-  
-  const confirmed = confirm(`⚠️ This will erase ALL data for ${playerName} (history, penalties, notifications, etc.) but KEEP their account. Continue?`);
-  if (!confirmed) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/erase-player-data`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: playerId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to erase player data');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    document.getElementById('erasePlayerDataModal').style.display = 'none';
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error erasing player data:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player data';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to erase player data', 'error');
-  }
-}
-
-// Wipe All Player Data (Keep Accounts)
-async function wipeAllPlayerData() {
-  const confirmed = confirm('⚠️ This will erase ALL data for ALL players (history, penalties, notifications, etc.) but KEEP their accounts. Continue?');
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL player data will be permanently deleted. Accounts will be kept. Are you sure?');
-  if (!doubleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/wipe-all-data`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to wipe all data');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error wiping all data:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to wipe all data';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to wipe all data', 'error');
-  }
-}
-
-// Remove ALL Players (Accounts + Data)
-async function removeAllPlayers() {
-  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will REMOVE ALL PLAYERS (accounts + all data) EXCEPT your admin account. This cannot be undone! Are you sure?');
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL players will be permanently deleted. Only your admin account will remain. Are you ABSOLUTELY sure?');
-  if (!doubleConfirm) return;
-  
-  const tripleConfirm = confirm('⚠️ LAST CHANCE: Type "YES" to confirm.');
-  if (!tripleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/remove-all-players`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to remove all players');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error removing all players:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to remove all players';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to remove all players', 'error');
-  }
-}
-
-// Add event listeners for erase buttons
-document.addEventListener('DOMContentLoaded', function() {
-  // ... existing DOMContentLoaded code ...
-  
-  // ERASE BUTTONS
-  const erasePlayerBtn = document.getElementById('erasePlayerBtn');
-  if (erasePlayerBtn) {
-    erasePlayerBtn.addEventListener('click', async function() {
-      await loadPlayersForErase('playerSelectErase');
-      document.getElementById('erasePlayerModal').style.display = 'flex';
-    });
-  }
-  
-  const erasePlayerDataBtn = document.getElementById('erasePlayerDataBtn');
-  if (erasePlayerDataBtn) {
-    erasePlayerDataBtn.addEventListener('click', async function() {
-      await loadPlayersForErase('playerSelectEraseData');
-      document.getElementById('erasePlayerDataModal').style.display = 'flex';
-    });
-  }
-  
-  const wipeAllDataBtn = document.getElementById('wipeAllDataBtn');
-  if (wipeAllDataBtn) {
-    wipeAllDataBtn.addEventListener('click', wipeAllPlayerData);
-  }
-  
-  const removeAllPlayersBtn = document.getElementById('removeAllPlayersBtn');
-  if (removeAllPlayersBtn) {
-    removeAllPlayersBtn.addEventListener('click', removeAllPlayers);
-  }
-  
-  // Close modals
-  const closeErasePlayerModal = document.getElementById('closeErasePlayerModal');
-  if (closeErasePlayerModal) {
-    closeErasePlayerModal.addEventListener('click', function() {
-      document.getElementById('erasePlayerModal').style.display = 'none';
-    });
-  }
-  
-  const closeErasePlayerDataModal = document.getElementById('closeErasePlayerDataModal');
-  if (closeErasePlayerDataModal) {
-    closeErasePlayerDataModal.addEventListener('click', function() {
-      document.getElementById('erasePlayerDataModal').style.display = 'none';
-    });
-  }
-  
-  // Confirm buttons
-  const confirmErasePlayerBtn = document.getElementById('confirmErasePlayerBtn');
-  if (confirmErasePlayerBtn) {
-    confirmErasePlayerBtn.addEventListener('click', erasePlayer);
-  }
-  
-  const confirmErasePlayerDataBtn = document.getElementById('confirmErasePlayerDataBtn');
-  if (confirmErasePlayerDataBtn) {
-    confirmErasePlayerDataBtn.addEventListener('click', erasePlayerData);
-  }
-  
-  // Click outside to close
-  window.addEventListener('click', function(e) {
-    const modal1 = document.getElementById('erasePlayerModal');
-    const modal2 = document.getElementById('erasePlayerDataModal');
-    if (e.target === modal1) modal1.style.display = 'none';
-    if (e.target === modal2) modal2.style.display = 'none';
-  });
 });
