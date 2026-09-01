@@ -1,4 +1,4 @@
-// Booking functions - With Admin-Only Test Controls
+// Booking functions - With Enhanced Notifications
 
 console.log('📚 booking.js loaded');
 
@@ -14,6 +14,120 @@ function isAdminUser(user) {
   if (user.email === 'admin@gmail.com') return true;
   if (user.username === 'admin') return true;
   return false;
+}
+
+// ===== NOTIFICATION DETAIL FUNCTIONS =====
+async function getNotificationDetails(notificationId) {
+  const token = window.getToken();
+  if (!token) return null;
+  
+  try {
+    const response = await fetch(`${window.API_URL}/booking/notification-details`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ notification_id: notificationId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch notification details');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching notification details:', error);
+    return null;
+  }
+}
+
+async function openNotificationDetail(notificationId) {
+  console.log('🔍 Opening notification detail:', notificationId);
+  
+  const modal = document.getElementById('notificationDetailModal');
+  const content = document.getElementById('notificationDetailContent');
+  
+  if (!modal || !content) return;
+  
+  modal.style.display = 'flex';
+  content.innerHTML = 'Loading...';
+  
+  try {
+    const details = await getNotificationDetails(notificationId);
+    
+    if (!details) {
+      content.innerHTML = '<p style="color: red;">Failed to load notification details.</p>';
+      return;
+    }
+    
+    let html = `
+      <div style="padding: 10px;">
+        <h3>📋 Notification Details</h3>
+        <hr style="margin: 15px 0;">
+        <div style="margin-bottom: 12px;">
+          <strong>Title:</strong> ${details.title || 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Message:</strong> ${details.message || 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Date:</strong> ${details.date ? new Date(details.date).toLocaleDateString() : 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Time:</strong> ${details.time ? new Date(details.time).toLocaleTimeString() : 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Day:</strong> ${details.day || 'N/A'}
+        </div>
+    `;
+    
+    // Show additional details based on type
+    if (details.type === 'penalty') {
+      html += `
+        <div style="margin-bottom: 12px;">
+          <strong>Penalty Amount:</strong> $${details.amount || '10.00'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Status:</strong> ${details.penalty_status || 'Pending'}
+        </div>
+        ${details.paid_at ? `<div style="margin-bottom: 12px;"><strong>Paid On:</strong> ${new Date(details.paid_at).toLocaleDateString()} at ${new Date(details.paid_at).toLocaleTimeString()}</div>` : ''}
+        <div style="margin-bottom: 12px;">
+          <strong>Reason:</strong> ${details.reason || 'Cancelled after court was booked'}
+        </div>
+      `;
+    } else if (details.type === 'replacement') {
+      html += `
+        <div style="margin-bottom: 12px;">
+          <strong>Original User:</strong> ${details.original_user || 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Replacement User:</strong> ${details.replacement_user || 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong>Status:</strong> ${details.replacement_status || 'Pending'}
+        </div>
+        ${details.approved_at ? `<div style="margin-bottom: 12px;"><strong>Approved On:</strong> ${new Date(details.approved_at).toLocaleDateString()} at ${new Date(details.approved_at).toLocaleTimeString()}</div>` : ''}
+      `;
+    } else if (details.type === 'info') {
+      html += `
+        <div style="margin-bottom: 12px;">
+          <strong>Description:</strong> ${details.description || 'N/A'}
+        </div>
+      `;
+    }
+    
+    html += `
+        <hr style="margin: 15px 0;">
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button onclick="document.getElementById('notificationDetailModal').style.display='none'" class="btn btn-secondary btn-sm">Close</button>
+        </div>
+      </div>
+    `;
+    
+    content.innerHTML = html;
+    
+  } catch (error) {
+    console.error('Error loading notification details:', error);
+    content.innerHTML = '<p style="color: red;">Failed to load notification details. Please try again.</p>';
+  }
 }
 
 // ===== NOTIFICATION FUNCTIONS =====
@@ -101,15 +215,21 @@ async function loadNotifications() {
       const typeColor = n.type === 'penalty' ? '#fc8181' : 
                         n.type === 'replacement' ? '#ed8936' : 
                         n.type === 'warning' ? '#f6e05e' : '#667eea';
+      const typeIcon = n.type === 'penalty' ? '💰' : 
+                       n.type === 'replacement' ? '🔄' : 
+                       n.type === 'warning' ? '⚠️' : 'ℹ️';
       
       html += `
         <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor}; ${isRead ? 'opacity: 0.7;' : ''}">
-          <div class="notification-icon">${n.type === 'penalty' ? '💰' : n.type === 'replacement' ? '🔄' : n.type === 'warning' ? '⚠️' : 'ℹ️'}</div>
+          <div class="notification-icon">${typeIcon}</div>
           <div class="notification-content">
             <div class="notification-title">${n.title}</div>
             <div class="notification-details">${n.message}</div>
             <div class="notification-date">${new Date(n.created_at).toLocaleString()}</div>
-            ${!isRead ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${n.id}">Mark as Read</button>` : ''}
+            <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+              ${!isRead ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${n.id}">Mark as Read</button>` : ''}
+              <button class="btn btn-sm btn-info more-info-btn" data-id="${n.id}">📖 More Info</button>
+            </div>
           </div>
         </div>
       `;
@@ -122,6 +242,14 @@ async function loadNotifications() {
       markBtns[i].addEventListener('click', async function() {
         const id = this.dataset.id;
         await markNotificationRead(id);
+      });
+    }
+    
+    const infoBtns = container.querySelectorAll('.more-info-btn');
+    for (let i = 0; i < infoBtns.length; i++) {
+      infoBtns[i].addEventListener('click', function() {
+        const id = this.dataset.id;
+        openNotificationDetail(id);
       });
     }
     
@@ -303,8 +431,9 @@ async function recordHistory(event_date, action_type, day, description, amount =
 // ===== TEST RUN MODE (ADMIN ONLY) =====
 let testRunMode = false;
 let testRunDay = 1;
+let isAdmin = false;
 
-// Sample users for simulation (only used when admin uses Test Run)
+// Sample users for simulation
 const SAMPLE_USERS = [
     { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
     { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
@@ -334,7 +463,6 @@ function getSimulatedNextWeekBookers() {
 }
 
 function toggleTestRun() {
-    // Check if user is admin
     if (!isAdmin) {
         window.showToast('❌ Admin access required', 'error');
         return;
@@ -344,22 +472,35 @@ function toggleTestRun() {
     if (wasActive) {
         testRunMode = false;
         localStorage.removeItem('testRunMode');
-        document.getElementById('testRunStatus').textContent = '';
-        document.getElementById('testRunStatus').style.color = '#666';
-        document.getElementById('testRunBtn').textContent = '🧪 Test Run';
-        document.getElementById('testRunBtn').className = 'btn btn-warning btn-sm';
+        const statusEl = document.getElementById('testRunStatus');
+        if (statusEl) {
+            statusEl.textContent = '';
+            statusEl.style.color = '#666';
+        }
+        const btn = document.getElementById('testRunBtn');
+        if (btn) {
+            btn.textContent = '🧪 Test Run';
+            btn.className = 'btn btn-warning btn-sm';
+        }
         window.showToast('🔴 Test Run disabled', 'info');
-        if (document.getElementById('testRunType')) {
-            document.getElementById('testRunType').textContent = '';
+        const typeEl = document.getElementById('testRunType');
+        if (typeEl) {
+            typeEl.textContent = '';
         }
         localStorage.removeItem('simulateSunday');
     } else {
         testRunMode = true;
         localStorage.setItem('testRunMode', 'true');
-        document.getElementById('testRunStatus').textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
-        document.getElementById('testRunStatus').style.color = '#f59e0b';
-        document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
-        document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
+        const statusEl = document.getElementById('testRunStatus');
+        if (statusEl) {
+            statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
+            statusEl.style.color = '#f59e0b';
+        }
+        const btn = document.getElementById('testRunBtn');
+        if (btn) {
+            btn.textContent = '🔴 Disable Test Run';
+            btn.className = 'btn btn-danger btn-sm';
+        }
         window.showToast('🧪 Test Run activated - Simulating Monday!', 'success');
         localStorage.removeItem('simulateSunday');
     }
@@ -367,7 +508,6 @@ function toggleTestRun() {
 }
 
 function simulateSunday() {
-    // Check if user is admin
     if (!isAdmin) {
         window.showToast('❌ Admin access required', 'error');
         return;
@@ -377,13 +517,20 @@ function simulateSunday() {
     localStorage.setItem('testRunMode', 'true');
     localStorage.setItem('simulateSunday', 'true');
     
-    document.getElementById('testRunStatus').textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
-    document.getElementById('testRunStatus').style.color = '#f56565';
-    document.getElementById('testRunBtn').textContent = '🔴 Disable Test Run';
-    document.getElementById('testRunBtn').className = 'btn btn-danger btn-sm';
-    if (document.getElementById('testRunType')) {
-        document.getElementById('testRunType').textContent = 'Sunday Simulation - Final Court Bookers (ADMIN ONLY)';
-        document.getElementById('testRunType').style.color = '#f56565';
+    const statusEl = document.getElementById('testRunStatus');
+    if (statusEl) {
+        statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
+        statusEl.style.color = '#f56565';
+    }
+    const btn = document.getElementById('testRunBtn');
+    if (btn) {
+        btn.textContent = '🔴 Disable Test Run';
+        btn.className = 'btn btn-danger btn-sm';
+    }
+    const typeEl = document.getElementById('testRunType');
+    if (typeEl) {
+        typeEl.textContent = 'Sunday Simulation - Final Court Bookers (ADMIN ONLY)';
+        typeEl.style.color = '#f56565';
     }
     window.showToast('🧪 Sunday Simulation activated - Showing simulated court bookers!', 'success');
     renderDashboard();
@@ -441,7 +588,6 @@ function isSelectionWindowOpen() {
     const now = new Date();
     let day = now.getDay();
     
-    // Only admin can use test mode
     if (testRunMode) {
         const isSunday = localStorage.getItem('simulateSunday') === 'true';
         if (isSunday) {
@@ -458,7 +604,6 @@ function getSelectionStatus() {
     const day = now.getDay();
     const isSunday = localStorage.getItem('simulateSunday') === 'true';
     
-    // Only show test run status to admin
     if (testRunMode && isSunday && isAdmin) {
         return {
             status: 'sunday',
@@ -527,7 +672,7 @@ const RULES_DATA = [
         category: '🔄 Replacement Rules',
         rules: [
             'You can find a replacement from any registered user',
-                       'The replacement must approve the request',
+            'The replacement must approve the request',
             'The replacement takes full responsibility for the booking',
             'If no replacement is found, you must pay the penalty'
         ]
@@ -581,7 +726,6 @@ function switchView(view) {
     document.getElementById('dashboardView').style.display = view === 'dashboard' ? 'block' : 'none';
     document.getElementById('rulesView').style.display = view === 'rules' ? 'block' : 'none';
     document.getElementById('notificationsView').style.display = view === 'notifications' ? 'block' : 'none';
-    document.getElementById('historyView').style.display = 'none';
     
     if (view === 'rules') renderRulesPage();
     if (view === 'notifications') {
@@ -990,23 +1134,25 @@ function renderMyAvailability(myAvailability, isBookedDays) {
 }
 
 // ============ TWO WEEK TABLE ============
-async function renderTwoWeekTable(isAdminUser) {
+async function renderTwoWeekTable() {
     const tbody = document.getElementById('selectedPlayersBody');
     if (!tbody) return;
     
-    const isSunday = localStorage.getItem('simulateSunday') === 'true';
-    const isTestRun = localStorage.getItem('testRunMode') === 'true';
+    // Check if Sunday indicator exists before trying to use it
+    const sundayIndicator = document.getElementById('sundayIndicator');
+    if (sundayIndicator) {
+        const isSunday = localStorage.getItem('simulateSunday') === 'true';
+        const isTestRun = localStorage.getItem('testRunMode') === 'true';
+        if (isSunday && isTestRun && isAdmin) {
+            sundayIndicator.style.display = 'inline';
+        } else {
+            sundayIndicator.style.display = 'none';
+        }
+    }
     
     const thisWeekDates = getThisWeekDates();
     const nextWeekDates = getNextWeekDates();
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    
-    // Only show Sunday simulation indicator to admins
-    if (isSunday && isTestRun && isAdminUser) {
-        document.getElementById('sundayIndicator').style.display = 'inline';
-    } else {
-        document.getElementById('sundayIndicator').style.display = 'none';
-    }
     
     let thisWeekBookers = [];
     let nextWeekSelected = [];
@@ -1020,7 +1166,9 @@ async function renderTwoWeekTable(isAdminUser) {
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
     // Only generate simulated data for admin test run
-    if (isSunday && isTestRun && isAdminUser) {
+    const isSunday = localStorage.getItem('simulateSunday') === 'true';
+    const isTestRun = localStorage.getItem('testRunMode') === 'true';
+    if (isSunday && isTestRun && isAdmin) {
         const simulatedThisWeek = getSimulatedThisWeekBookers();
         const simulatedNextWeek = getSimulatedNextWeekBookers();
         thisWeekBookers = simulatedThisWeek;
@@ -1061,8 +1209,10 @@ async function renderTwoWeekTable(isAdminUser) {
     }
     
     if (!hasData) {
-        if (isAdminUser) {
-            if (isSunday && isTestRun) {
+        if (isAdmin) {
+            const isSunday2 = localStorage.getItem('simulateSunday') === 'true';
+            const isTestRun2 = localStorage.getItem('testRunMode') === 'true';
+            if (isSunday2 && isTestRun2) {
                 html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first.</td></tr>';
             } else {
                 html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Use Test Run to see a preview (Admin only).</td></tr>';
@@ -1098,8 +1248,6 @@ function closeOptOutModal() {
     selectedBookingId = null;
 }
 
-let isAdmin = false;
-
 async function renderDashboard() {
     const daysGrid = document.getElementById('daysGrid');
     if (!daysGrid) return;
@@ -1107,7 +1255,15 @@ async function renderDashboard() {
     try {
         const user = window.getCurrentUser();
         currentUser = user;
-        isAdmin = await window.checkAdmin();
+        
+        // Check admin status with better error handling
+        try {
+            isAdmin = await window.checkAdmin();
+        } catch (error) {
+            console.error('Error checking admin:', error);
+            isAdmin = false;
+        }
+        
         const canEditBool = canEdit();
         const selectionStatus = getSelectionStatus();
         const weekDisplay = document.getElementById('weekDisplay');
@@ -1134,12 +1290,10 @@ async function renderDashboard() {
             warningBanner.style.display = canEditBool ? 'none' : 'block';
         }
         
-        // Admin controls - only shown if user is admin
         const adminControls = document.getElementById('adminControls');
         if (adminControls) {
             if (isAdmin) {
                 adminControls.style.display = 'block';
-                // Show test buttons
                 const testControls = document.getElementById('adminTestControls');
                 if (testControls) testControls.style.display = 'flex';
                 const eraseControls = document.getElementById('adminEraseControls');
@@ -1201,7 +1355,7 @@ async function renderDashboard() {
         }
         const myAvailability = await getMyAvailability();
         renderMyAvailability(myAvailability, bookedDays);
-        await renderTwoWeekTable(isAdmin);
+        await renderTwoWeekTable();
         await checkNotifications();
         await updateNotificationBadge();
     } catch (error) {
@@ -1818,9 +1972,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('panelNotifications').addEventListener('click', function() {
             switchView('notifications');
         });
-        document.getElementById('panelHistory').addEventListener('click', function() {
-            switchView('notifications');
-        });
         const panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
             panelAdmin.addEventListener('click', openAdminPanel);
@@ -1892,7 +2043,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.logoutUser();
         });
         
-        // TEST RUN BUTTONS (only shown to admins via CSS)
+        // TEST RUN BUTTONS
         const testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
@@ -1907,7 +2058,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // ERASE BUTTONS (only shown to admins via CSS)
+        // ERASE BUTTONS
         const erasePlayerBtn = document.getElementById('erasePlayerBtn');
         if (erasePlayerBtn) {
             erasePlayerBtn.addEventListener('click', async function() {
