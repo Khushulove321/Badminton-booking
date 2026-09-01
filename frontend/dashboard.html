@@ -19,7 +19,6 @@
         </div>
         <div class="panel-content">
             <button class="panel-btn" id="panelMyAvailability">📅 My Availability</button>
-            <button class="panel-btn" id="panelHistory">📜 My History</button>
             <button class="panel-btn" id="panelRules">📋 Rules</button>
             <button class="panel-btn" id="panelNotifications">🔔 Notifications</button>
             <button class="panel-btn" id="panelAdmin" style="display:none;">👑 Admin Panel</button>
@@ -57,7 +56,7 @@
                         <div id="deadlineWarning" class="warning-banner" style="display:none;">
                             ⚠️ Selection window is closed. You can only view your selections.
                         </div>
-                        <!-- Admin Controls - Hidden by default, only shown to admins -->
+                        <!-- Admin Controls -->
                         <div id="adminControls" style="display: none;">
                             <p class="admin-badge">👑 Admin Controls</p>
                             <div id="adminTestControls" style="display: flex; align-items: center; gap: 15px; margin-top: 10px; flex-wrap: wrap;">
@@ -78,14 +77,14 @@
 
                     <div class="days-grid" id="daysGrid"></div>
 
-                    <!-- TWO WEEK TABLE -->
+                    <!-- BOOKING SCHEDULE TABLE -->
                     <div class="selected-players-section">
-                        <h3>🏆 Court Bookers for This Week & Next Week</h3>
+                        <h3>📅 Weekly Booking Schedule</h3>
                         <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
-                            Shows who is booking the court for this week and who will book for next week.
-                            <br><span style="font-size:0.85rem;color:#888;">Updated every Sunday night and visible for the entire week.</span>
+                            Who is responsible for booking the court each day.
+                            <br><span style="font-size:0.85rem;color:#888;">Updated every Sunday night.</span>
                         </p>
-                        <div id="selectedPlayersTable" class="selected-players-table">
+                        <div id="scheduleTable" class="selected-players-table">
                             <table>
                                 <thead>
                                     <tr>
@@ -94,8 +93,8 @@
                                         <th>Next Week</th>
                                     </tr>
                                 </thead>
-                                <tbody id="selectedPlayersBody">
-                                    <tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 Loading court bookers...</td></tr>
+                                <tbody id="scheduleBody">
+                                    <tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 Loading schedule...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -108,8 +107,8 @@
                                 <li>Selection opens every Monday (all day)</li>
                                 <li>Select your availability for the NEXT week</li>
                                 <li>Click "In for [Day]" to mark yourself available</li>
-                                <li>Selected players are chosen on Sunday night for the week after next</li>
-                                <li>Court bookers are visible for the entire week</li>
+                                <li>Every Sunday, a random player is selected for each day</li>
+                                <li>Selected players are notified and must confirm</li>
                             </ul>
                         </div>
                         <div class="info-card" id="myAvailability">
@@ -136,18 +135,25 @@
                     <div id="notificationsList">Loading notifications...</div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- HISTORY VIEW -->
-            <div id="historyView" style="display:none;">
-                <div class="dashboard">
-                    <h2>📜 My History</h2>
-                    <div id="historyCalendar" style="margin-bottom: 20px;">
-                        Loading calendar...
-                    </div>
-                    <div id="historyDetailsList">
-                        <p style="color: #888; text-align: center; padding: 20px;">Select a month to view events.</p>
-                    </div>
-                </div>
+    <!-- NOTIFICATION DETAIL MODAL -->
+    <div id="notificationDetailModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="close-btn" id="closeNotificationDetailModal">&times;</button>
+            <div id="notificationDetailContent">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- DAY DETAIL MODAL -->
+    <div id="dayDetailModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="close-btn" id="closeDayDetailModal">&times;</button>
+            <div id="dayDetailContent">
+                Loading...
             </div>
         </div>
     </div>
@@ -180,17 +186,7 @@
         </div>
     </div>
 
-    <!-- HISTORY DETAIL MODAL -->
-    <div id="historyDetailModal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <button class="close-btn" id="closeHistoryModal">&times;</button>
-            <div id="historyDetailContent">
-                Loading...
-            </div>
-        </div>
-    </div>
-
-    <!-- MODALS -->
+    <!-- OPT OUT MODAL -->
     <div id="optOutModal" class="modal" style="display:none;">
         <div class="modal-content">
             <button class="close-btn" id="closeOptOutModal">&times;</button>
@@ -250,6 +246,5 @@
     <script src="/js/supabase-setup.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/booking.js"></script>
-    <script src="/js/history.js"></script>
 </body>
 </html>
