@@ -1203,3 +1203,79 @@ body {
         padding: 2px 6px !important;
     }
 }
+
+/* Player Dropdown Styles */
+.player-dropdown {
+    margin: 5px 0;
+    font-size: 0.85rem;
+}
+
+.player-dropdown summary {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #ebf4ff;
+    border-radius: 12px;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.player-dropdown summary:hover {
+    background: #c3dafe;
+}
+
+.player-dropdown[open] summary {
+    background: #667eea;
+    color: white;
+}
+
+.player-dropdown details > div {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.player-dropdown details > div::-webkit-scrollbar {
+    width: 4px;
+}
+
+.player-dropdown details > div::-webkit-scrollbar-track {
+    background: #f7fafc;
+    border-radius: 10px;
+}
+
+.player-dropdown details > div::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 10px;
+}
+
+/* Schedule Table Enhancements */
+#selectedPlayersBody td {
+    vertical-align: top;
+    padding: 12px 15px;
+}
+
+#selectedPlayersBody td:first-child {
+    font-weight: 500;
+    min-width: 120px;
+}
+
+#selectedPlayersBody .player-dropdown summary {
+    font-size: 0.8rem;
+    padding: 3px 8px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    #selectedPlayersBody td {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    #selectedPlayersBody td:first-child {
+        min-width: 80px;
+    }
+    
+    .player-dropdown summary {
+        font-size: 0.75rem !important;
+        padding: 2px 6px !important;
+    }
+}
