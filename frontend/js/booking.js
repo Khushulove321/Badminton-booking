@@ -11,17 +11,6 @@ let testRunMode = false;
 let testRunDay = 1;
 let isAdmin = false;
 
-// ===== SAMPLE USERS FOR SIMULATION =====
-const SAMPLE_USERS = [
-    { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
-    { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
-    { id: 'user3', username: 'bob_wilson', full_name: 'Bob Wilson' },
-    { id: 'user4', username: 'alice_brown', full_name: 'Alice Brown' },
-    { id: 'user5', username: 'charlie_davis', full_name: 'Charlie Davis' },
-    { id: 'user6', username: 'emma_jones', full_name: 'Emma Jones' },
-    { id: 'user7', username: 'mike_miller', full_name: 'Mike Miller' },
-];
-
 // ===== ADMIN EXCLUSION FUNCTIONS =====
 function isAdminUser(user) {
     if (!user) return false;
@@ -317,34 +306,6 @@ async function recordHistory(event_date, action_type, day, description, amount, 
 }
 
 // ===== TEST RUN MODE =====
-function getSimulatedThisWeekBookers() {
-    var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    var shuffled = SAMPLE_USERS.slice().sort(function() { return Math.random() - 0.5; });
-    var result = [];
-    for (var i = 0; i < dayOrder.length; i++) {
-        result.push({
-            day: dayOrder[i],
-            selected_user: shuffled[i % shuffled.length],
-            available_count: Math.floor(Math.random() * 15) + 5
-        });
-    }
-    return result;
-}
-
-function getSimulatedNextWeekBookers() {
-    var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    var shuffled = SAMPLE_USERS.slice().sort(function() { return Math.random() - 0.5; });
-    var result = [];
-    for (var i = 0; i < dayOrder.length; i++) {
-        result.push({
-            day: dayOrder[i],
-            selected_user: shuffled[(i + 3) % shuffled.length],
-            available_count: Math.floor(Math.random() * 15) + 5
-        });
-    }
-    return result;
-}
-
 function toggleTestRun() {
     var wasActive = testRunMode;
     if (wasActive) {
@@ -710,7 +671,9 @@ async function getMyAvailability() {
             }
         });
         if (!response.ok) throw new Error('Failed to fetch your availability');
-        return await response.json();
+        var data = await response.json();
+        console.log('📊 My availability:', data);
+        return data;
     } catch (error) {
         console.error('Error fetching my availability:', error);
         return [];
@@ -744,7 +707,9 @@ async function getThisWeekBookers() {
             }
         });
         if (!response.ok) throw new Error('Failed to fetch this week bookers');
-        return await response.json();
+        var data = await response.json();
+        console.log('📊 This week bookers:', data);
+        return data;
     } catch (error) {
         console.error('Error fetching this week bookers:', error);
         return [];
@@ -761,7 +726,9 @@ async function getNextWeekSelected() {
             }
         });
         if (!response.ok) throw new Error('Failed to fetch selected players');
-        return await response.json();
+        var data = await response.json();
+        console.log('📊 Next week selected:', data);
+        return data;
     } catch (error) {
         console.error('Error fetching selected players:', error);
         return [];
@@ -944,30 +911,28 @@ async function renderTwoWeekTable(isAdminUser) {
         sundayIndicator.style.display = (isSunday && isTestRun && isAdminUser) ? 'inline' : 'none';
     }
     
+    // Fetch real data
     var thisWeekBookers = [];
     var nextWeekSelected = [];
+    var allBookings = [];
     
     try {
         thisWeekBookers = await getThisWeekBookers();
+        console.log('📊 This week bookers from API:', thisWeekBookers);
     } catch (e) { console.error('Error fetching this week bookers:', e); }
+    
     try {
         nextWeekSelected = await getNextWeekSelected();
+        console.log('📊 Next week selected from API:', nextWeekSelected);
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
-    if (isSunday && isTestRun && isAdminUser) {
-        var simulatedThisWeek = getSimulatedThisWeekBookers();
-        var simulatedNextWeek = getSimulatedNextWeekBookers();
-        thisWeekBookers = simulatedThisWeek;
-        nextWeekSelected = simulatedNextWeek;
-    }
+    try {
+        allBookings = await getAvailability('next');
+        console.log('📊 All bookings from API:', allBookings);
+    } catch (e) { console.error('Error fetching bookings:', e); }
     
     var html = '';
     var hasData = false;
-    var allBookings = [];
-    try {
-        allBookings = await getAvailability('next');
-        console.log('📊 All bookings for table:', allBookings);
-    } catch (e) { console.error('Error fetching bookings:', e); }
     
     for (var i = 0; i < dayOrder.length; i++) {
         var day = dayOrder[i];
@@ -996,8 +961,9 @@ async function renderTwoWeekTable(isAdminUser) {
             hasData = true;
             var user = thisWeekBooker.selected_user;
             thisWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
-            thisWeekCount = thisWeekBooker.available_count || 0;
+            thisWeekCount = thisWeekBooker.available_count || (thisWeekBooker.available_users ? thisWeekBooker.available_users.length : 0);
             thisWeekUsers = thisWeekBooker.available_users || [];
+            console.log('📊 ' + day + ' this week users:', thisWeekUsers);
         }
         
         // Get next week data
@@ -1024,11 +990,12 @@ async function renderTwoWeekTable(isAdminUser) {
             hasData = true;
             var user = nextWeekBooker.selected_user;
             nextWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
-            nextWeekCount = nextWeekBooker.available_count || 0;
+            nextWeekCount = nextWeekBooker.available_count || (nextWeekBooker.available_users ? nextWeekBooker.available_users.length : 0);
             nextWeekUsers = nextWeekBooker.available_users || [];
+            console.log('📊 ' + day + ' next week users:', nextWeekUsers);
         }
         
-        // Get available users from booking data
+        // Check in allBookings for real data
         var booking = null;
         for (var j = 0; j < allBookings.length; j++) {
             if (allBookings[j].day === day) {
@@ -1037,20 +1004,29 @@ async function renderTwoWeekTable(isAdminUser) {
             }
         }
         
-        // Use booking data for counts if available
+        // Use booking data for counts if available (this is the REAL data)
         if (booking) {
             if (booking.available_users) {
                 var count = booking.available_users.length;
-                if (nextWeekCount === 0 || count > 0) {
+                // Only override if we have real data
+                if (count > 0 || nextWeekCount === 0) {
                     nextWeekCount = count;
                     nextWeekUsers = booking.available_users;
                 }
-                console.log('📊 ' + day + ' available users:', count);
+                console.log('📊 ' + day + ' real available users count:', count);
+                console.log('📊 ' + day + ' real users:', booking.available_users);
+            }
+            // Check if this is booked
+            if (booking.is_booked && booking.selected_user) {
+                var user = booking.selected_user;
+                nextWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
+                hasData = true;
             }
         }
         
-        // Create dropdown HTML
-        var dropdownHtml = renderPlayerDropdown(nextWeekUsers.length > 0 ? nextWeekUsers : thisWeekUsers, day);
+        // Create dropdown HTML - use the users we found
+        var usersToShow = nextWeekUsers.length > 0 ? nextWeekUsers : thisWeekUsers;
+        var dropdownHtml = renderPlayerDropdown(usersToShow, day);
         
         html += '<tr>';
         html += '<td><strong>' + day + '</strong><br><span style="font-size:0.8rem;color:#888;">' + thisWeekDateStr + '</span></td>';
@@ -1080,6 +1056,7 @@ async function renderTwoWeekTable(isAdminUser) {
     }
     
     tbody.innerHTML = html;
+    console.log('📊 Table HTML rendered');
 }
 
 function openOptOutModal(day, bookingId) {
