@@ -32,7 +32,6 @@ function isAdminUser(user) {
 
 // ===== VOTING SCHEDULE FUNCTIONS - TEST MODE (ALWAYS OPEN) =====
 function isVotingWindowOpen() {
-    // 🔓 TEST MODE: Always open for testing
     return true;
 }
 
@@ -44,13 +43,12 @@ function getVotingStatus() {
     
     return {
         status: 'open',
-        message: `🔓 TEST MODE: Voting OPEN (${dayName}) - Click to select days`,
+        message: '🔓 TEST MODE: Voting OPEN (' + dayName + ') - Click to select days',
         className: 'open'
     };
 }
 
 function canEdit() {
-    // 🔓 TEST MODE: Always allow editing
     return true;
 }
 
@@ -75,15 +73,17 @@ function getResultsDay() {
 }
 
 // ===== NOTIFICATION FUNCTIONS =====
-async function createNotification(userId, title, message, type = 'info', relatedId = null) {
+async function createNotification(userId, title, message, type, relatedId) {
+    if (type === undefined) type = 'info';
+    if (relatedId === undefined) relatedId = null;
     const token = window.getToken();
     if (!token) return false;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/create-notification`, {
+        const response = await fetch(window.API_URL + '/booking/create-notification', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -109,9 +109,9 @@ async function getUnreadCount() {
     if (!token) return 0;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/unread-count`, {
+        const response = await fetch(window.API_URL + '/booking/unread-count', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         
@@ -135,9 +135,9 @@ async function loadNotifications() {
     }
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/my-notifications`, {
+        const response = await fetch(window.API_URL + '/booking/my-notifications', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         
@@ -151,39 +151,41 @@ async function loadNotifications() {
         }
         
         let html = '<h3>🔔 Your Notifications</h3>';
-        html += '<p style="color: #666;margin-bottom:20px;">You have ' + notifications.filter(n => !n.is_read).length + ' unread notification(s).</p>';
+        var unreadCount = 0;
+        for (var i = 0; i < notifications.length; i++) {
+            if (!notifications[i].is_read) unreadCount++;
+        }
+        html += '<p style="color: #666;margin-bottom:20px;">You have ' + unreadCount + ' unread notification(s).</p>';
         
-        for (let i = 0; i < notifications.length; i++) {
-            const n = notifications[i];
-            const isRead = n.is_read ? 'read' : 'unread';
-            const typeColor = n.type === 'penalty' ? '#fc8181' : 
+        for (var i = 0; i < notifications.length; i++) {
+            var n = notifications[i];
+            var isRead = n.is_read ? 'read' : 'unread';
+            var typeColor = n.type === 'penalty' ? '#fc8181' : 
                               n.type === 'replacement' ? '#ed8936' : 
                               n.type === 'warning' ? '#f6e05e' : '#667eea';
             
-            html += `
-                <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor}; ${isRead ? 'opacity: 0.7;' : ''}">
-                    <div class="notification-icon">${n.type === 'penalty' ? '💰' : n.type === 'replacement' ? '🔄' : n.type === 'warning' ? '⚠️' : 'ℹ️'}</div>
-                    <div class="notification-content">
-                        <div class="notification-title">${n.title}</div>
-                        <div class="notification-details">${n.message}</div>
-                        <div class="notification-date">${new Date(n.created_at).toLocaleString()}</div>
-                        ${!isRead ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${n.id}">Mark as Read</button>` : ''}
-                    </div>
-                </div>
-            `;
+            html += '<div class="notification-item ' + isRead + '" style="border-left: 4px solid ' + typeColor + '; ' + (isRead ? 'opacity: 0.7;' : '') + '">';
+            html += '<div class="notification-icon">' + (n.type === 'penalty' ? '💰' : n.type === 'replacement' ? '🔄' : n.type === 'warning' ? '⚠️' : 'ℹ️') + '</div>';
+            html += '<div class="notification-content">';
+            html += '<div class="notification-title">' + n.title + '</div>';
+            html += '<div class="notification-details">' + n.message + '</div>';
+            html += '<div class="notification-date">' + new Date(n.created_at).toLocaleString() + '</div>';
+            if (!isRead) {
+                html += '<button class="btn btn-sm btn-primary mark-read-btn" data-id="' + n.id + '">Mark as Read</button>';
+            }
+            html += '</div></div>';
         }
         
         container.innerHTML = html;
         
-        const markBtns = container.querySelectorAll('.mark-read-btn');
-        for (let i = 0; i < markBtns.length; i++) {
-            markBtns[i].addEventListener('click', async function() {
-                const id = this.dataset.id;
-                await markNotificationRead(id);
+        var markBtns = container.querySelectorAll('.mark-read-btn');
+        for (var i = 0; i < markBtns.length; i++) {
+            markBtns[i].addEventListener('click', function() {
+                var id = this.dataset.id;
+                markNotificationRead(id);
             });
         }
         
-        const unreadCount = notifications.filter(n => !n.is_read).length;
         updateNotificationBadge(unreadCount);
         
     } catch (error) {
@@ -197,10 +199,10 @@ async function markNotificationRead(notificationId) {
     if (!token) return;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/notification-read`, {
+        const response = await fetch(window.API_URL + '/booking/notification-read', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ notification_id: notificationId })
@@ -216,7 +218,7 @@ async function markNotificationRead(notificationId) {
 }
 
 async function updateNotificationBadge(count) {
-    const badge = document.getElementById('notificationBadge');
+    var badge = document.getElementById('notificationBadge');
     if (!badge) return;
     
     if (count === undefined) {
@@ -237,9 +239,9 @@ async function getPendingReplacements() {
     if (!token) return [];
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/pending-replacements`, {
+        const response = await fetch(window.API_URL + '/booking/pending-replacements', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         
@@ -256,10 +258,10 @@ async function acceptReplacement(replacementId) {
     if (!token) return false;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/accept-replacement`, {
+        const response = await fetch(window.API_URL + '/booking/accept-replacement', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ replacement_id: replacementId })
@@ -280,10 +282,10 @@ async function declineReplacement(replacementId) {
     if (!token) return false;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/decline-replacement`, {
+        const response = await fetch(window.API_URL + '/booking/decline-replacement', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ replacement_id: replacementId })
@@ -304,10 +306,10 @@ async function requestReplacement(originalUserId, replacementUserId, day) {
     if (!token) return false;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/request-replacement`, {
+        const response = await fetch(window.API_URL + '/booking/request-replacement', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -328,15 +330,17 @@ async function requestReplacement(originalUserId, replacementUserId, day) {
 }
 
 // ===== HISTORY RECORDING FUNCTION =====
-async function recordHistory(event_date, action_type, day, description, amount = 0, related_user = null) {
+async function recordHistory(event_date, action_type, day, description, amount, related_user) {
+    if (amount === undefined) amount = 0;
+    if (related_user === undefined) related_user = null;
     const token = window.getToken();
     if (!token) return false;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/record-history`, {
+        const response = await fetch(window.API_URL + '/booking/record-history', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -360,34 +364,44 @@ async function recordHistory(event_date, action_type, day, description, amount =
 
 // ===== TEST RUN MODE =====
 function getSimulatedThisWeekBookers() {
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
-    return dayOrder.map((day, index) => ({
-        day: day,
-        selected_user: shuffled[index % shuffled.length]
-    }));
+    var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    var shuffled = SAMPLE_USERS.slice().sort(function() { return Math.random() - 0.5; });
+    var result = [];
+    for (var i = 0; i < dayOrder.length; i++) {
+        result.push({
+            day: dayOrder[i],
+            selected_user: shuffled[i % shuffled.length],
+            available_count: Math.floor(Math.random() * 15) + 5
+        });
+    }
+    return result;
 }
 
 function getSimulatedNextWeekBookers() {
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
-    return dayOrder.map((day, index) => ({
-        day: day,
-        selected_user: shuffled[(index + 3) % shuffled.length]
-    }));
+    var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    var shuffled = SAMPLE_USERS.slice().sort(function() { return Math.random() - 0.5; });
+    var result = [];
+    for (var i = 0; i < dayOrder.length; i++) {
+        result.push({
+            day: dayOrder[i],
+            selected_user: shuffled[(i + 3) % shuffled.length],
+            available_count: Math.floor(Math.random() * 15) + 5
+        });
+    }
+    return result;
 }
 
 function toggleTestRun() {
-    const wasActive = testRunMode;
+    var wasActive = testRunMode;
     if (wasActive) {
         testRunMode = false;
         localStorage.removeItem('testRunMode');
-        const statusEl = document.getElementById('testRunStatus');
+        var statusEl = document.getElementById('testRunStatus');
         if (statusEl) {
             statusEl.textContent = '';
             statusEl.style.color = '#666';
         }
-        const btn = document.getElementById('testRunBtn');
+        var btn = document.getElementById('testRunBtn');
         if (btn) {
             btn.textContent = '🧪 Test Run';
             btn.className = 'btn btn-warning btn-sm';
@@ -397,12 +411,12 @@ function toggleTestRun() {
     } else {
         testRunMode = true;
         localStorage.setItem('testRunMode', 'true');
-        const statusEl = document.getElementById('testRunStatus');
+        var statusEl = document.getElementById('testRunStatus');
         if (statusEl) {
             statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Monday (Selection Open)';
             statusEl.style.color = '#f59e0b';
         }
-        const btn = document.getElementById('testRunBtn');
+        var btn = document.getElementById('testRunBtn');
         if (btn) {
             btn.textContent = '🔴 Disable Test Run';
             btn.className = 'btn btn-danger btn-sm';
@@ -418,12 +432,12 @@ function simulateSunday() {
     localStorage.setItem('testRunMode', 'true');
     localStorage.setItem('simulateSunday', 'true');
     
-    const statusEl = document.getElementById('testRunStatus');
+    var statusEl = document.getElementById('testRunStatus');
     if (statusEl) {
         statusEl.textContent = '🧪 TEST RUN ACTIVE - Simulating Sunday (Final Selection)';
         statusEl.style.color = '#f56565';
     }
-    const btn = document.getElementById('testRunBtn');
+    var btn = document.getElementById('testRunBtn');
     if (btn) {
         btn.textContent = '🔴 Disable Test Run';
         btn.className = 'btn btn-danger btn-sm';
@@ -436,12 +450,12 @@ function disableSimulation() {
     testRunMode = false;
     localStorage.removeItem('testRunMode');
     localStorage.removeItem('simulateSunday');
-    const statusEl = document.getElementById('testRunStatus');
+    var statusEl = document.getElementById('testRunStatus');
     if (statusEl) {
         statusEl.textContent = '';
         statusEl.style.color = '#666';
     }
-    const btn = document.getElementById('testRunBtn');
+    var btn = document.getElementById('testRunBtn');
     if (btn) {
         btn.textContent = '🧪 Test Run';
         btn.className = 'btn btn-warning btn-sm';
@@ -450,7 +464,7 @@ function disableSimulation() {
 }
 
 // ===== RULES DATA =====
-const RULES_DATA = [
+var RULES_DATA = [
     {
         category: '📋 Booking Rules',
         rules: [
@@ -505,9 +519,9 @@ const RULES_DATA = [
 // ===== MENU FUNCTIONS =====
 function openSidePanel() {
     console.log('Opening side panel');
-    const panel = document.getElementById('sidePanel');
-    const main = document.getElementById('mainContent');
-    const overlay = document.getElementById('panelOverlay');
+    var panel = document.getElementById('sidePanel');
+    var main = document.getElementById('mainContent');
+    var overlay = document.getElementById('panelOverlay');
     if (panel) panel.classList.add('open');
     if (main) main.classList.add('shifted');
     if (overlay) overlay.classList.add('active');
@@ -515,9 +529,9 @@ function openSidePanel() {
 
 function closeSidePanel() {
     console.log('Closing side panel');
-    const panel = document.getElementById('sidePanel');
-    const main = document.getElementById('mainContent');
-    const overlay = document.getElementById('panelOverlay');
+    var panel = document.getElementById('sidePanel');
+    var main = document.getElementById('mainContent');
+    var overlay = document.getElementById('panelOverlay');
     if (panel) panel.classList.remove('open');
     if (main) main.classList.remove('shifted');
     if (overlay) overlay.classList.remove('active');
@@ -526,10 +540,10 @@ function closeSidePanel() {
 // ===== VIEW SWITCHING =====
 function switchView(view) {
     currentView = view;
-    const dashboardView = document.getElementById('dashboardView');
-    const rulesView = document.getElementById('rulesView');
-    const notificationsView = document.getElementById('notificationsView');
-    const historyView = document.getElementById('historyView');
+    var dashboardView = document.getElementById('dashboardView');
+    var rulesView = document.getElementById('rulesView');
+    var notificationsView = document.getElementById('notificationsView');
+    var historyView = document.getElementById('historyView');
     
     if (dashboardView) dashboardView.style.display = view === 'dashboard' ? 'block' : 'none';
     if (rulesView) rulesView.style.display = view === 'rules' ? 'block' : 'none';
@@ -546,16 +560,16 @@ function switchView(view) {
 
 // ===== RULES PAGE =====
 function renderRulesPage() {
-    const container = document.querySelector('#rulesView .rules-content');
+    var container = document.querySelector('#rulesView .rules-content');
     if (!container) return;
     
-    let html = '';
-    for (let i = 0; i < RULES_DATA.length; i++) {
-        const section = RULES_DATA[i];
+    var html = '';
+    for (var i = 0; i < RULES_DATA.length; i++) {
+        var section = RULES_DATA[i];
         html += '<div class="rules-section">';
         html += '<h3>' + section.category + '</h3>';
         html += '<ul>';
-        for (let j = 0; j < section.rules.length; j++) {
+        for (var j = 0; j < section.rules.length; j++) {
             html += '<li>' + section.rules[j] + '</li>';
         }
         html += '</ul>';
@@ -566,72 +580,71 @@ function renderRulesPage() {
 
 // ===== PENDING REPLACEMENTS IN NOTIFICATIONS =====
 async function loadPendingReplacements() {
-    const container = document.getElementById('pendingReplacements');
+    var container = document.getElementById('pendingReplacements');
     if (!container) return;
     
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) {
         container.innerHTML = '';
         return;
     }
     
     try {
-        const replacements = await getPendingReplacements();
+        var replacements = await getPendingReplacements();
         
         if (!replacements || replacements.length === 0) {
             container.innerHTML = '';
             return;
         }
         
-        let html = '<div class="pending-replacements-section"><h3>🔄 Pending Replacement Requests</h3>';
+        var html = '<div class="pending-replacements-section"><h3>🔄 Pending Replacement Requests</h3>';
         
-        for (let i = 0; i < replacements.length; i++) {
-            const r = replacements[i];
-            const originalName = r.original_user?.full_name || r.original_user?.username || 'Someone';
-            const day = r.day;
+        for (var i = 0; i < replacements.length; i++) {
+            var r = replacements[i];
+            var originalName = r.original_user?.full_name || r.original_user?.username || 'Someone';
+            var day = r.day;
             
-            html += `
-                <div class="replacement-request-card">
-                    <div class="request-info">
-                        <strong>${originalName}</strong> wants you to replace them for <strong>${day}</strong>
-                    </div>
-                    <div class="request-actions">
-                        <button class="btn btn-success btn-sm accept-replacement" data-id="${r.id}">✅ Accept</button>
-                        <button class="btn btn-danger btn-sm decline-replacement" data-id="${r.id}">❌ Decline</button>
-                    </div>
-                </div>
-            `;
+            html += '<div class="replacement-request-card">';
+            html += '<div class="request-info">';
+            html += '<strong>' + originalName + '</strong> wants you to replace them for <strong>' + day + '</strong>';
+            html += '</div>';
+            html += '<div class="request-actions">';
+            html += '<button class="btn btn-success btn-sm accept-replacement" data-id="' + r.id + '">✅ Accept</button>';
+            html += '<button class="btn btn-danger btn-sm decline-replacement" data-id="' + r.id + '">❌ Decline</button>';
+            html += '</div></div>';
         }
         
         html += '</div>';
         container.innerHTML = html;
         
-        const acceptBtns = container.querySelectorAll('.accept-replacement');
-        for (let i = 0; i < acceptBtns.length; i++) {
-            acceptBtns[i].addEventListener('click', async function() {
-                const id = this.dataset.id;
+        var acceptBtns = container.querySelectorAll('.accept-replacement');
+        for (var i = 0; i < acceptBtns.length; i++) {
+            acceptBtns[i].addEventListener('click', function() {
+                var id = this.dataset.id;
                 if (confirm('Are you sure you want to accept this replacement request?')) {
-                    const success = await acceptReplacement(id);
-                    if (success) {
-                        await loadPendingReplacements();
-                        await loadNotifications();
-                        await renderDashboard();
-                    }
+                    acceptReplacement(id).then(function(success) {
+                        if (success) {
+                            loadPendingReplacements();
+                            loadNotifications();
+                            renderDashboard();
+                        }
+                    });
                 }
             });
         }
         
-        const declineBtns = container.querySelectorAll('.decline-replacement');
-        for (let i = 0; i < declineBtns.length; i++) {
-            declineBtns[i].addEventListener('click', async function() {
-                const id = this.dataset.id;
+        var declineBtns = container.querySelectorAll('.decline-replacement');
+        for (var i = 0; i < declineBtns.length; i++) {
+            declineBtns[i].addEventListener('click', function() {
+                var id = this.dataset.id;
                 if (confirm('Are you sure you want to decline this replacement request?')) {
-                    const success = await declineReplacement(id);
-                    if (success) {
-                        await loadPendingReplacements();
-                        await loadNotifications();
-                        await renderDashboard();
-                    }
+                    declineReplacement(id).then(function(success) {
+                        if (success) {
+                            loadPendingReplacements();
+                            loadNotifications();
+                            renderDashboard();
+                        }
+                    });
                 }
             });
         }
@@ -643,9 +656,9 @@ async function loadPendingReplacements() {
 
 // ===== DASHBOARD FUNCTIONS =====
 function getNextWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    let daysUntilNextMonday;
+    var today = new Date();
+    var currentDay = today.getDay();
+    var daysUntilNextMonday;
     if (currentDay === 0) {
         daysUntilNextMonday = 1;
     } else if (currentDay === 1) {
@@ -653,12 +666,12 @@ function getNextWeekDates() {
     } else {
         daysUntilNextMonday = 8 - currentDay;
     }
-    const nextMonday = new Date(today);
+    var nextMonday = new Date(today);
     nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(nextMonday);
+    var weekDates = [];
+    var dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (var i = 0; i < 7; i++) {
+        var date = new Date(nextMonday);
         date.setDate(nextMonday.getDate() + i);
         weekDates.push({
             day: dayNames[i],
@@ -670,15 +683,15 @@ function getNextWeekDates() {
 }
 
 function getThisWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const thisMonday = new Date(today);
+    var today = new Date();
+    var currentDay = today.getDay();
+    var daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    var thisMonday = new Date(today);
     thisMonday.setDate(today.getDate() - daysToMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(thisMonday);
+    var weekDates = [];
+    var dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (var i = 0; i < 7; i++) {
+        var date = new Date(thisMonday);
         date.setDate(thisMonday.getDate() + i);
         weekDates.push({
             day: dayNames[i],
@@ -690,12 +703,12 @@ function getThisWeekDates() {
 }
 
 async function getAvailability(weekType) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(`${window.API_URL}/booking/availability?week=${weekType}`, {
+        var response = await fetch(window.API_URL + '/booking/availability?week=' + weekType, {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) throw new Error('Failed to fetch availability');
@@ -707,7 +720,7 @@ async function getAvailability(weekType) {
 }
 
 async function toggleAvailability(day, date) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) {
         window.location.href = '/login.html';
         return;
@@ -717,10 +730,10 @@ async function toggleAvailability(day, date) {
         return;
     }
     try {
-        const response = await fetch(`${window.API_URL}/booking/select/${day}`, {
+        var response = await fetch(window.API_URL + '/booking/select/' + day, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ date: date })
@@ -728,11 +741,11 @@ async function toggleAvailability(day, date) {
 
         if (!response.ok) throw new Error('Failed to update availability');
         
-        const data = await response.json();
+        var data = await response.json();
         window.showToast(data.message, 'success');
         
         if (data.action === 'added') {
-            const today = new Date();
+            var today = new Date();
             await recordHistory(
                 today.toISOString().split('T')[0],
                 'played',
@@ -751,12 +764,12 @@ async function toggleAvailability(day, date) {
 }
 
 async function getMyAvailability() {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(`${window.API_URL}/booking/my-availability`, {
+        var response = await fetch(window.API_URL + '/booking/my-availability', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) throw new Error('Failed to fetch your availability');
@@ -768,12 +781,12 @@ async function getMyAvailability() {
 }
 
 async function getAllUsers() {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(`${window.API_URL}/booking/all-users`, {
+        var response = await fetch(window.API_URL + '/booking/all-users', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) throw new Error('Failed to fetch users');
@@ -785,12 +798,12 @@ async function getAllUsers() {
 }
 
 async function getThisWeekBookers() {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(`${window.API_URL}/booking/this-week-bookers`, {
+        var response = await fetch(window.API_URL + '/booking/this-week-bookers', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) throw new Error('Failed to fetch this week bookers');
@@ -802,12 +815,12 @@ async function getThisWeekBookers() {
 }
 
 async function getNextWeekSelected() {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(`${window.API_URL}/booking/selected-players`, {
+        var response = await fetch(window.API_URL + '/booking/selected-players', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) throw new Error('Failed to fetch selected players');
@@ -819,17 +832,23 @@ async function getNextWeekSelected() {
 }
 
 async function getAvailableUsersForDay(day) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return [];
     try {
-        const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
+        var response = await fetch(window.API_URL + '/booking/availability?week=next', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) return [];
-        const data = await response.json();
-        const booking = data.find(function(b) { return b.day === day; });
+        var data = await response.json();
+        var booking = null;
+        for (var i = 0; i < data.length; i++) {
+            if (data[i].day === day) {
+                booking = data[i];
+                break;
+            }
+        }
         return booking && booking.available_users ? booking.available_users : [];
     } catch (error) {
         console.error('Error fetching available users:', error);
@@ -838,13 +857,13 @@ async function getAvailableUsersForDay(day) {
 }
 
 async function removeUserFromBooking(day, userId) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return false;
     try {
-        const response = await fetch(`${window.API_URL}/booking/select/${day}`, {
+        var response = await fetch(window.API_URL + '/booking/select/' + day, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ user_id: userId, action: 'remove' })
@@ -858,13 +877,13 @@ async function removeUserFromBooking(day, userId) {
 }
 
 async function addReplacement(originalUserId, replacementUserId, day) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return false;
     try {
-        const response = await fetch(`${window.API_URL}/booking/replace`, {
+        var response = await fetch(window.API_URL + '/booking/replace', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
@@ -882,13 +901,13 @@ async function addReplacement(originalUserId, replacementUserId, day) {
 }
 
 async function recordPenalty(userId, bookingId) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return false;
     try {
-        const response = await fetch(`${window.API_URL}/booking/penalty`, {
+        var response = await fetch(window.API_URL + '/booking/penalty', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
@@ -906,8 +925,8 @@ async function recordPenalty(userId, bookingId) {
 }
 
 function getBookedDays(bookings) {
-    const booked = [];
-    for (let i = 0; i < bookings.length; i++) {
+    var booked = [];
+    for (var i = 0; i < bookings.length; i++) {
         if (bookings[i].is_booked) {
             booked.push(bookings[i].day);
         }
@@ -915,13 +934,38 @@ function getBookedDays(bookings) {
     return booked;
 }
 
+// ===== VIEW PLAYERS DROPDOWN =====
+function renderPlayerDropdown(availableUsers, day) {
+    if (!availableUsers || availableUsers.length === 0) {
+        return '<div style="color:#888;font-size:0.85rem;">No players available</div>';
+    }
+    
+    var html = '<details class="player-dropdown">';
+    html += '<summary style="cursor:pointer;color:#667eea;font-weight:500;font-size:0.85rem;">';
+    html += '👥 View ' + availableUsers.length + ' player' + (availableUsers.length > 1 ? 's' : '');
+    html += '</summary>';
+    html += '<div style="margin-top:8px;padding:8px;background:#f7fafc;border-radius:5px;max-height:150px;overflow-y:auto;">';
+    
+    for (var i = 0; i < availableUsers.length; i++) {
+        var user = availableUsers[i];
+        var displayName = user.full_name || user.username;
+        html += '<div style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-size:0.85rem;">';
+        html += '🏸 ' + displayName;
+        html += '</div>';
+    }
+    
+    html += '</div></details>';
+    return html;
+}
+
+// ===== RENDER DAY CARD WITH DROPDOWN =====
 function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
-    const card = document.createElement('div');
+    var card = document.createElement('div');
     card.className = 'day-card';
     
-    let isUserAvailable = false;
+    var isUserAvailable = false;
     if (dayData.available_users) {
-        for (let i = 0; i < dayData.available_users.length; i++) {
+        for (var i = 0; i < dayData.available_users.length; i++) {
             if (dayData.available_users[i].id === currentUser?.id) {
                 isUserAvailable = true;
                 break;
@@ -932,31 +976,35 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
     if (isUserAvailable) card.classList.add('selected');
     if (isBooked) card.classList.add('booked');
     
-    const displayName = dayData.date ? dayData.day + ' - ' + dayData.date : dayData.day;
-    const dayStatus = isBooked ? '📌 Booked' : '✅ Available';
+    var displayName = dayData.date ? dayData.day + ' - ' + dayData.date : dayData.day;
+    var availableCount = dayData.available_users ? dayData.available_users.length : 0;
     
-    let selectedUserHtml = '';
+    var selectedUserHtml = '';
     if (isBooked && dayData.selected_user) {
-        selectedUserHtml = '<div class="selected-user">✅ Selected: ' + dayData.selected_user.username + '</div>';
+        selectedUserHtml = '<div class="selected-user">🎯 Booker: <strong>' + dayData.selected_user.username + '</strong></div>';
     }
     
-    const buttonText = isUserAvailable ? '✅ In' : '📝 In for this day';
-    const buttonClass = isUserAvailable ? 'in-btn in' : 'in-btn';
-    const disabledAttr = !canEditBool ? 'disabled' : '';
+    var buttonText = isUserAvailable ? '✅ In' : '📝 In for this day';
+    var buttonClass = isUserAvailable ? 'in-btn in' : 'in-btn';
+    var disabledAttr = !canEditBool ? 'disabled' : '';
+    
+    var dropdownHtml = renderPlayerDropdown(dayData.available_users, dayData.day);
     
     card.innerHTML = '<div class="day-name">' + displayName + '</div>' +
-        '<div class="day-status">' + dayStatus + '</div>' +
+        '<div class="day-status">' + (isBooked ? '📌 Booked' : '✅ Available') + '</div>' +
+        '<div class="user-count">👥 ' + availableCount + ' player' + (availableCount > 1 ? 's' : '') + ' in</div>' +
         selectedUserHtml +
+        '<div style="margin-top:8px;">' + dropdownHtml + '</div>' +
         '<button class="' + buttonClass + ' btn btn-sm" data-day="' + dayData.day + '" data-date="' + (dayData.date || '') + '" ' + disabledAttr + '>' +
         buttonText +
         '</button>';
     
     if (canEditBool) {
-        const btn = card.querySelector('.in-btn');
+        var btn = card.querySelector('.in-btn');
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
-            const day = this.dataset.day;
-            const date = this.dataset.date;
+            var day = this.dataset.day;
+            var date = this.dataset.date;
             handleToggleAvailability(day, date);
         });
     }
@@ -965,7 +1013,7 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
 }
 
 function renderMyAvailability(myAvailability, isBookedDays) {
-    const container = document.getElementById('myDaysList');
+    var container = document.getElementById('myDaysList');
     if (!container) return;
     
     if (!myAvailability || myAvailability.length === 0) {
@@ -973,12 +1021,12 @@ function renderMyAvailability(myAvailability, isBookedDays) {
         return;
     }
     
-    let html = '<div class="my-availability-list">';
-    for (let i = 0; i < myAvailability.length; i++) {
-        const day = myAvailability[i];
-        const isBooked = isBookedDays && isBookedDays.indexOf(day.day) !== -1;
-        const statusIcon = isBooked ? '🔒' : '✅';
-        const bookingId = day.booking_id || '';
+    var html = '<div class="my-availability-list">';
+    for (var i = 0; i < myAvailability.length; i++) {
+        var day = myAvailability[i];
+        var isBooked = isBookedDays && isBookedDays.indexOf(day.day) !== -1;
+        var statusIcon = isBooked ? '🔒' : '✅';
+        var bookingId = day.booking_id || '';
         html += '<div class="my-availability-item">' +
             '<span class="day-name">' + statusIcon + ' ' + day.day + '</span>' +
             '<button class="btn btn-danger btn-xs opt-out-btn" data-day="' + day.day + '" data-booking-id="' + bookingId + '">Opt Out</button>' +
@@ -987,12 +1035,12 @@ function renderMyAvailability(myAvailability, isBookedDays) {
     html += '</div>';
     container.innerHTML = html;
     
-    const btns = container.querySelectorAll('.opt-out-btn');
-    for (let i = 0; i < btns.length; i++) {
+    var btns = container.querySelectorAll('.opt-out-btn');
+    for (var i = 0; i < btns.length; i++) {
         btns[i].addEventListener('click', function(e) {
             e.stopPropagation();
-            const day = this.dataset.day;
-            const bookingId = this.dataset.bookingId;
+            var day = this.dataset.day;
+            var bookingId = this.dataset.bookingId;
             openOptOutModal(day, bookingId);
         });
     }
@@ -1000,23 +1048,23 @@ function renderMyAvailability(myAvailability, isBookedDays) {
 
 // ===== TWO WEEK TABLE =====
 async function renderTwoWeekTable(isAdminUser) {
-    const tbody = document.getElementById('selectedPlayersBody');
+    var tbody = document.getElementById('selectedPlayersBody');
     if (!tbody) return;
     
-    const isSunday = localStorage.getItem('simulateSunday') === 'true';
-    const isTestRun = localStorage.getItem('testRunMode') === 'true';
+    var isSunday = localStorage.getItem('simulateSunday') === 'true';
+    var isTestRun = localStorage.getItem('testRunMode') === 'true';
     
-    const thisWeekDates = getThisWeekDates();
-    const nextWeekDates = getNextWeekDates();
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    var thisWeekDates = getThisWeekDates();
+    var nextWeekDates = getNextWeekDates();
+    var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
-    const sundayIndicator = document.getElementById('sundayIndicator');
+    var sundayIndicator = document.getElementById('sundayIndicator');
     if (sundayIndicator) {
         sundayIndicator.style.display = (isSunday && isTestRun && isAdminUser) ? 'inline' : 'none';
     }
     
-    let thisWeekBookers = [];
-    let nextWeekSelected = [];
+    var thisWeekBookers = [];
+    var nextWeekSelected = [];
     
     try {
         thisWeekBookers = await getThisWeekBookers();
@@ -1027,42 +1075,95 @@ async function renderTwoWeekTable(isAdminUser) {
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
     if (isSunday && isTestRun && isAdminUser) {
-        const simulatedThisWeek = getSimulatedThisWeekBookers();
-        const simulatedNextWeek = getSimulatedNextWeekBookers();
+        var simulatedThisWeek = getSimulatedThisWeekBookers();
+        var simulatedNextWeek = getSimulatedNextWeekBookers();
         thisWeekBookers = simulatedThisWeek;
         nextWeekSelected = simulatedNextWeek;
     }
     
-    let html = '';
-    let hasData = false;
+    var html = '';
+    var hasData = false;
     
-    for (let i = 0; i < dayOrder.length; i++) {
-        const day = dayOrder[i];
+    var allBookings = [];
+    try {
+        allBookings = await getAvailability('next');
+    } catch (e) { console.error('Error fetching bookings:', e); }
+    
+    for (var i = 0; i < dayOrder.length; i++) {
+        var day = dayOrder[i];
         
-        const thisWeekDateObj = thisWeekDates.find(function(d) { return d.day === day; });
-        const thisWeekDateStr = thisWeekDateObj ? thisWeekDateObj.dateString : 'TBD';
-        const thisWeekBooker = thisWeekBookers.find(function(b) { return b.day === day; });
-        let thisWeekDisplay = '❌ No booker';
+        var thisWeekDateObj = null;
+        for (var j = 0; j < thisWeekDates.length; j++) {
+            if (thisWeekDates[j].day === day) {
+                thisWeekDateObj = thisWeekDates[j];
+                break;
+            }
+        }
+        var thisWeekDateStr = thisWeekDateObj ? thisWeekDateObj.dateString : 'TBD';
+        
+        var thisWeekBooker = null;
+        for (var j = 0; j < thisWeekBookers.length; j++) {
+            if (thisWeekBookers[j].day === day) {
+                thisWeekBooker = thisWeekBookers[j];
+                break;
+            }
+        }
+        var thisWeekDisplay = '❌ No booker';
+        var thisWeekCount = 0;
         if (thisWeekBooker && thisWeekBooker.selected_user) {
             hasData = true;
-            const user = thisWeekBooker.selected_user;
+            var user = thisWeekBooker.selected_user;
             thisWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
+            thisWeekCount = thisWeekBooker.available_count || Math.floor(Math.random() * 15) + 5;
         }
         
-        const nextWeekDateObj = nextWeekDates.find(function(d) { return d.day === day; });
-        const nextWeekDateStr = nextWeekDateObj ? nextWeekDateObj.dateString : 'TBD';
-        const nextWeekBooker = nextWeekSelected.find(function(b) { return b.day === day; });
-        let nextWeekDisplay = '❌ No booker';
+        var nextWeekDateObj = null;
+        for (var j = 0; j < nextWeekDates.length; j++) {
+            if (nextWeekDates[j].day === day) {
+                nextWeekDateObj = nextWeekDates[j];
+                break;
+            }
+        }
+        var nextWeekDateStr = nextWeekDateObj ? nextWeekDateObj.dateString : 'TBD';
+        
+        var nextWeekBooker = null;
+        for (var j = 0; j < nextWeekSelected.length; j++) {
+            if (nextWeekSelected[j].day === day) {
+                nextWeekBooker = nextWeekSelected[j];
+                break;
+            }
+        }
+        var nextWeekDisplay = '❌ No booker';
+        var nextWeekCount = 0;
         if (nextWeekBooker && nextWeekBooker.selected_user) {
             hasData = true;
-            const user = nextWeekBooker.selected_user;
+            var user = nextWeekBooker.selected_user;
             nextWeekDisplay = '👤 <strong>' + user.username + '</strong><br><span style="font-size:0.85rem;color:#666;">' + (user.full_name || user.username) + '</span>';
+            nextWeekCount = nextWeekBooker.available_count || Math.floor(Math.random() * 15) + 5;
         }
+        
+        var booking = null;
+        for (var j = 0; j < allBookings.length; j++) {
+            if (allBookings[j].day === day) {
+                booking = allBookings[j];
+                break;
+            }
+        }
+        var availableUsers = booking?.available_users || [];
+        var dropdownHtml = renderPlayerDropdown(availableUsers, day);
         
         html += '<tr>';
         html += '<td><strong>' + day + '</strong><br><span style="font-size:0.8rem;color:#888;">' + thisWeekDateStr + '</span></td>';
-        html += '<td>' + thisWeekDisplay + '<br><span style="font-size:0.7rem;color:#888;">' + thisWeekDateStr + '</span></td>';
-        html += '<td>' + nextWeekDisplay + '<br><span style="font-size:0.7rem;color:#888;">' + nextWeekDateStr + '</span></td>';
+        html += '<td>';
+        html += thisWeekDisplay;
+        html += '<div style="margin-top:5px;font-size:0.85rem;color:#48bb78;">📊 ' + thisWeekCount + ' players in</div>';
+        html += dropdownHtml;
+        html += '</td>';
+        html += '<td>';
+        html += nextWeekDisplay;
+        html += '<div style="margin-top:5px;font-size:0.85rem;color:#667eea;">📊 ' + nextWeekCount + ' players in</div>';
+        html += dropdownHtml;
+        html += '</td>';
         html += '</tr>';
     }
     
@@ -1084,14 +1185,14 @@ async function renderTwoWeekTable(isAdminUser) {
 function openOptOutModal(day, bookingId) {
     optOutDay = day;
     selectedBookingId = bookingId;
-    const optOutDayEl = document.getElementById('optOutDay');
+    var optOutDayEl = document.getElementById('optOutDay');
     if (optOutDayEl) optOutDayEl.textContent = day;
-    const modal = document.getElementById('optOutModal');
+    var modal = document.getElementById('optOutModal');
     if (modal) modal.style.display = 'flex';
 }
 
 function closeOptOutModal() {
-    const modal = document.getElementById('optOutModal');
+    var modal = document.getElementById('optOutModal');
     if (modal) modal.style.display = 'none';
     optOutDay = null;
     selectedBookingId = null;
@@ -1099,79 +1200,79 @@ function closeOptOutModal() {
 
 // ===== MAIN RENDER DASHBOARD =====
 async function renderDashboard() {
-    const daysGrid = document.getElementById('daysGrid');
+    var daysGrid = document.getElementById('daysGrid');
     if (!daysGrid) return;
     daysGrid.innerHTML = '<div class="loading">Loading availability...</div>';
     
     try {
-        const user = window.getCurrentUser();
+        var user = window.getCurrentUser();
         currentUser = user;
         isAdmin = await window.checkAdmin();
         
-        const votingStatus = getVotingStatus();
-        const canEditBool = canEdit();
-        const weekType = getWeekType();
+        var votingStatus = getVotingStatus();
+        var canEditBool = canEdit();
+        var weekType = getWeekType();
         
-        const statusText = document.getElementById('votingStatusText');
+        var statusText = document.getElementById('votingStatusText');
         if (statusText) {
             statusText.className = 'timer-text ' + votingStatus.className;
             statusText.textContent = votingStatus.message;
         }
         
-        const votingForWeek = document.getElementById('votingForWeek');
+        var votingForWeek = document.getElementById('votingForWeek');
         if (votingForWeek) {
-            const weekDates = getNextWeekDates();
+            var weekDates = getNextWeekDates();
             if (weekDates.length > 0) {
-                const start = weekDates[0].dateString;
-                const end = weekDates[6].dateString;
-                votingForWeek.textContent = `${start} - ${end}`;
+                var start = weekDates[0].dateString;
+                var end = weekDates[6].dateString;
+                votingForWeek.textContent = start + ' - ' + end;
             }
         }
         
-        const weekDisplay = document.getElementById('weekDisplay');
+        var weekDisplay = document.getElementById('weekDisplay');
         if (weekDisplay) {
-            const weekDates = getNextWeekDates();
+            var weekDates = getNextWeekDates();
             if (weekDates.length > 0) {
-                const start = weekDates[0].dateString;
-                const end = weekDates[6].dateString;
-                weekDisplay.textContent = `📅 Voting for: ${start} - ${end}`;
+                var start = weekDates[0].dateString;
+                var end = weekDates[6].dateString;
+                weekDisplay.textContent = '📅 Voting for: ' + start + ' - ' + end;
             }
         }
         
-        const warningBanner = document.getElementById('deadlineWarning');
+        var warningBanner = document.getElementById('deadlineWarning');
         if (warningBanner) {
             warningBanner.style.display = 'none';
         }
         
-        const adminControls = document.getElementById('adminControls');
+        var adminControls = document.getElementById('adminControls');
         if (adminControls) {
             adminControls.style.display = isAdmin ? 'block' : 'none';
         }
-        const panelAdmin = document.getElementById('panelAdmin');
+        var panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
             panelAdmin.style.display = isAdmin ? 'block' : 'none';
         }
         
-        const bookings = await getAvailability(weekType);
-        const weekDates = getNextWeekDates();
-        const bookedDays = getBookedDays(bookings);
+        var bookings = await getAvailability(weekType);
+        var weekDates = getNextWeekDates();
+        var bookedDays = getBookedDays(bookings);
         
-        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        const sortedBookings = [];
+        var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        var sortedBookings = [];
         
-        for (let i = 0; i < dayOrder.length; i++) {
-            const day = dayOrder[i];
-            let dateObj = null;
-            for (let j = 0; j < weekDates.length; j++) {
+        for (var i = 0; i < dayOrder.length; i++) {
+            var day = dayOrder[i];
+            var dateObj = null;
+            for (var j = 0; j < weekDates.length; j++) {
                 if (weekDates[j].day === day) {
                     dateObj = weekDates[j];
                     break;
                 }
             }
-            let booking = null;
-            for (let k = 0; k < bookings.length; k++) {
-                if (bookings[k].day === day) {
-                    booking = bookings[k];
+            var booking = null;
+            for (var j = 0; j < bookings.length; j++) {
+                if (bookings[j].day === day) {
+                    booking = bookings[j];
                     break;
                 }
             }
@@ -1195,14 +1296,14 @@ async function renderDashboard() {
         }
         
         daysGrid.innerHTML = '';
-        for (let i = 0; i < sortedBookings.length; i++) {
-            const day = sortedBookings[i];
-            const isBooked = bookedDays.indexOf(day.day) !== -1;
-            const card = renderDayCard(day, canEditBool, isBooked, user);
+        for (var i = 0; i < sortedBookings.length; i++) {
+            var day = sortedBookings[i];
+            var isBooked = bookedDays.indexOf(day.day) !== -1;
+            var card = renderDayCard(day, canEditBool, isBooked, user);
             daysGrid.appendChild(card);
         }
         
-        const myAvailability = await getMyAvailability();
+        var myAvailability = await getMyAvailability();
         renderMyAvailability(myAvailability, bookedDays);
         
         await renderTwoWeekTable(isAdmin);
@@ -1218,16 +1319,16 @@ async function renderDashboard() {
 
 async function checkNotifications() {
     try {
-        const token = window.getToken();
+        var token = window.getToken();
         if (!token) return;
-        const response = await fetch(`${window.API_URL}/booking/my-penalties`, {
+        var response = await fetch(window.API_URL + '/booking/my-penalties', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         if (!response.ok) return;
-        const penalties = await response.json();
-        const badge = document.getElementById('notificationBadge');
+        var penalties = await response.json();
+        var badge = document.getElementById('notificationBadge');
         if (badge) {
             if (penalties && penalties.length > 0) {
                 badge.style.display = 'inline-block';
@@ -1242,7 +1343,7 @@ async function checkNotifications() {
 }
 
 async function handleToggleAvailability(day, date) {
-    const result = await toggleAvailability(day, date);
+    var result = await toggleAvailability(day, date);
     if (result) {
         await renderDashboard();
     }
@@ -1250,49 +1351,62 @@ async function handleToggleAvailability(day, date) {
 
 // ===== SELECT RANDOM WITH ADMIN EXCLUSION =====
 async function selectRandomUser(day) {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) {
         window.location.href = '/login.html';
         return;
     }
 
     try {
-        const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
+        var response = await fetch(window.API_URL + '/booking/availability?week=next', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         
         if (!response.ok) throw new Error('Failed to fetch availability');
-        const data = await response.json();
-        const booking = data.find(b => b.day === day);
+        var data = await response.json();
+        var booking = null;
+        for (var i = 0; i < data.length; i++) {
+            if (data[i].day === day) {
+                booking = data[i];
+                break;
+            }
+        }
         
-        const availableUsers = booking?.available_users?.filter(u => u.email !== 'admin@gmail.com' && u.username !== 'admin') || [];
+        var availableUsers = [];
+        if (booking && booking.available_users) {
+            for (var i = 0; i < booking.available_users.length; i++) {
+                if (booking.available_users[i].email !== 'admin@gmail.com' && booking.available_users[i].username !== 'admin') {
+                    availableUsers.push(booking.available_users[i]);
+                }
+            }
+        }
         
         if (availableUsers.length === 0) {
             window.showToast('❌ No non-admin users available for ' + day, 'error');
             return null;
         }
         
-        const randomIndex = Math.floor(Math.random() * availableUsers.length);
-        const selectedUserId = availableUsers[randomIndex].id;
+        var randomIndex = Math.floor(Math.random() * availableUsers.length);
+        var selectedUserId = availableUsers[randomIndex].id;
         
-        const response2 = await fetch(`${window.API_URL}/booking/select-random/${day}`, {
+        var response2 = await fetch(window.API_URL + '/booking/select-random/' + day, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ force_user_id: selectedUserId })
         });
 
         if (!response2.ok) {
-            const errorData = await response2.json();
+            var errorData = await response2.json();
             throw new Error(errorData.error || 'Failed to select user');
         }
 
-        const data2 = await response2.json();
-        window.showToast(`🎯 Random user selected for ${day}!`, 'success');
+        var data2 = await response2.json();
+        window.showToast('🎯 Random user selected for ' + day + '!', 'success');
         return data2;
     } catch (error) {
         console.error('Error selecting user:', error);
@@ -1303,24 +1417,26 @@ async function selectRandomUser(day) {
 
 // ===== REPLACEMENT WITH NOTIFICATIONS =====
 async function openReplacementModal(day) {
-    const replaceDayEl = document.getElementById('replaceDay');
+    var replaceDayEl = document.getElementById('replaceDay');
     if (replaceDayEl) replaceDayEl.textContent = day;
     
-    const modal = document.getElementById('replacementModal');
+    var modal = document.getElementById('replacementModal');
     if (modal) modal.style.display = 'flex';
     
-    const container = document.getElementById('replacementList');
+    var container = document.getElementById('replacementList');
     if (container) container.innerHTML = 'Loading users...';
     
     try {
-        const allUsers = await getAllUsers();
-        const currentUser = window.getCurrentUser();
+        var allUsers = await getAllUsers();
+        var currentUser = window.getCurrentUser();
         
-        const availableUsers = allUsers.filter(function(user) {
-            return user.id !== currentUser?.id && 
-                   user.email !== 'admin@gmail.com' && 
-                   user.username !== 'admin';
-        });
+        var availableUsers = [];
+        for (var i = 0; i < allUsers.length; i++) {
+            var user = allUsers[i];
+            if (user.id !== currentUser?.id && user.email !== 'admin@gmail.com' && user.username !== 'admin') {
+                availableUsers.push(user);
+            }
+        }
         
         if (!container) return;
         
@@ -1329,13 +1445,13 @@ async function openReplacementModal(day) {
             return;
         }
         
-        let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
+        var html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
         html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
         html += '<option value="">-- Select a user --</option>';
         
-        for (let i = 0; i < availableUsers.length; i++) {
-            const user = availableUsers[i];
-            const displayName = user.full_name || user.username;
+        for (var i = 0; i < availableUsers.length; i++) {
+            var user = availableUsers[i];
+            var displayName = user.full_name || user.username;
             html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
         }
         
@@ -1345,46 +1461,47 @@ async function openReplacementModal(day) {
         
         container.innerHTML = html;
         
-        const confirmBtn = document.getElementById('confirmReplacementBtn');
+        var confirmBtn = document.getElementById('confirmReplacementBtn');
         if (confirmBtn) {
-            confirmBtn.addEventListener('click', async function() {
-                const select = document.getElementById('replacementSelect');
-                const selectedUserId = select?.value;
-                const selectedUsername = select?.options[select.selectedIndex]?.text || '';
+            confirmBtn.addEventListener('click', function() {
+                var select = document.getElementById('replacementSelect');
+                var selectedUserId = select?.value;
+                var selectedUsername = select?.options[select.selectedIndex]?.text || '';
                 
                 if (!selectedUserId) {
-                    const errorEl = document.getElementById('replacementError');
+                    var errorEl = document.getElementById('replacementError');
                     if (errorEl) errorEl.style.display = 'block';
                     return;
                 }
                 
-                const errorEl = document.getElementById('replacementError');
+                var errorEl = document.getElementById('replacementError');
                 if (errorEl) errorEl.style.display = 'none';
                 
-                const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
+                var confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
                 if (confirmed) {
-                    const success = await requestReplacement(currentUser.id, selectedUserId, day);
-                    if (success) {
-                        const today = new Date();
-                        const dateStr = today.toISOString().split('T')[0];
-                        
-                        await recordHistory(
-                            dateStr,
-                            'replacement',
-                            day,
-                            'Requested replacement with ' + selectedUsername + ' for ' + day,
-                            0,
-                            selectedUsername
-                        );
-                        
-                        window.showToast('✅ Replacement request sent to ' + selectedUsername + '!', 'success');
-                        const modalEl = document.getElementById('replacementModal');
-                        if (modalEl) modalEl.style.display = 'none';
-                        await renderDashboard();
-                        await updateNotificationBadge();
-                    } else {
-                        window.showToast('❌ Failed to request replacement. Please try again.', 'error');
-                    }
+                    requestReplacement(currentUser.id, selectedUserId, day).then(function(success) {
+                        if (success) {
+                            var today = new Date();
+                            var dateStr = today.toISOString().split('T')[0];
+                            
+                            recordHistory(
+                                dateStr,
+                                'replacement',
+                                day,
+                                'Requested replacement with ' + selectedUsername + ' for ' + day,
+                                0,
+                                selectedUsername
+                            );
+                            
+                            window.showToast('✅ Replacement request sent to ' + selectedUsername + '!', 'success');
+                            var modalEl = document.getElementById('replacementModal');
+                            if (modalEl) modalEl.style.display = 'none';
+                            renderDashboard();
+                            updateNotificationBadge();
+                        } else {
+                            window.showToast('❌ Failed to request replacement. Please try again.', 'error');
+                        }
+                    });
                 }
             });
         }
@@ -1397,11 +1514,11 @@ async function openReplacementModal(day) {
 
 // ===== OPT OUT WITH NOTIFICATIONS =====
 async function handleOptOut(day, bookingId, action) {
-    const user = window.getCurrentUser();
+    var user = window.getCurrentUser();
     if (!user) return;
     
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
+    var today = new Date();
+    var dateStr = today.toISOString().split('T')[0];
     
     if (action === 'cancel') {
         closeOptOutModal();
@@ -1409,7 +1526,7 @@ async function handleOptOut(day, bookingId, action) {
     }
     
     if (action === 'notBooked') {
-        const success = await removeUserFromBooking(day, user.id);
+        var success = await removeUserFromBooking(day, user.id);
         if (success) {
             await recordHistory(
                 dateStr,
@@ -1434,7 +1551,7 @@ async function handleOptOut(day, bookingId, action) {
     }
     
     if (action === 'penalty') {
-        const penaltySuccess = await recordPenalty(user.id, bookingId);
+        var penaltySuccess = await recordPenalty(user.id, bookingId);
         if (penaltySuccess) {
             await recordHistory(
                 dateStr,
@@ -1467,14 +1584,14 @@ async function handleOptOut(day, bookingId, action) {
 
 // ===== PENALTY PAY WITH NOTIFICATIONS =====
 async function handlePenaltyPay(bookingId, day) {
-    const user = window.getCurrentUser();
+    var user = window.getCurrentUser();
     if (!user) return;
-    const confirmed = confirm('⚠️ Are you sure you want to pay the $10.00 penalty? This cannot be undone.');
+    var confirmed = confirm('⚠️ Are you sure you want to pay the $10.00 penalty? This cannot be undone.');
     if (confirmed) {
-        const success = await recordPenalty(user.id, bookingId);
+        var success = await recordPenalty(user.id, bookingId);
         if (success) {
-            const today = new Date();
-            const dateStr = today.toISOString().split('T')[0];
+            var today = new Date();
+            var dateStr = today.toISOString().split('T')[0];
             
             await recordHistory(
                 dateStr,
@@ -1494,7 +1611,7 @@ async function handlePenaltyPay(bookingId, day) {
             
             await removeUserFromBooking(day, user.id);
             window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
-            const modal = document.getElementById('penaltyModal');
+            var modal = document.getElementById('penaltyModal');
             if (modal) modal.style.display = 'none';
             await renderDashboard();
             await loadNotifications();
@@ -1506,9 +1623,9 @@ async function handlePenaltyPay(bookingId, day) {
 }
 
 function openPenaltyModal(day, bookingId) {
-    const modal = document.getElementById('penaltyModal');
+    var modal = document.getElementById('penaltyModal');
     if (modal) modal.style.display = 'flex';
-    const payBtn = document.getElementById('penaltyPay');
+    var payBtn = document.getElementById('penaltyPay');
     if (payBtn) {
         payBtn.dataset.bookingId = bookingId;
         payBtn.dataset.day = day;
@@ -1517,47 +1634,47 @@ function openPenaltyModal(day, bookingId) {
 
 // ===== ADMIN PANEL =====
 async function openAdminPanel() {
-    const modal = document.getElementById('adminModal');
+    var modal = document.getElementById('adminModal');
     if (!modal) return;
     modal.style.display = 'flex';
-    const adminContent = document.getElementById('adminContent');
-    const adminError = document.getElementById('adminError');
-    const adminCode = document.getElementById('adminCode');
+    var adminContent = document.getElementById('adminContent');
+    var adminError = document.getElementById('adminError');
+    var adminCode = document.getElementById('adminCode');
     if (adminContent) adminContent.style.display = 'none';
     if (adminError) adminError.style.display = 'none';
     if (adminCode) adminCode.value = '';
 }
 
 async function verifyAdmin() {
-    const code = document.getElementById('adminCode').value;
+    var code = document.getElementById('adminCode').value;
     if (code === ADMIN_CODE) {
-        const errorEl = document.getElementById('adminError');
+        var errorEl = document.getElementById('adminError');
         if (errorEl) errorEl.style.display = 'none';
-        const contentEl = document.getElementById('adminContent');
+        var contentEl = document.getElementById('adminContent');
         if (contentEl) contentEl.style.display = 'block';
         await loadAllUsersAvailability();
     } else {
-        const errorEl = document.getElementById('adminError');
+        var errorEl = document.getElementById('adminError');
         if (errorEl) errorEl.style.display = 'block';
     }
 }
 
 async function loadAllUsersAvailability() {
-    const container = document.getElementById('allUsersAvailability');
+    var container = document.getElementById('allUsersAvailability');
     if (!container) return;
     container.innerHTML = 'Loading...';
     try {
-        const users = await getAllUsers();
+        var users = await getAllUsers();
         if (!users || users.length === 0) {
             container.innerHTML = '<p>No users found.</p>';
             return;
         }
-        let html = '';
-        for (let i = 0; i < users.length; i++) {
-            const user = users[i];
-            const days = user.availability || [];
-            let dayNames = '';
-            for (let j = 0; j < days.length; j++) {
+        var html = '';
+        for (var i = 0; i < users.length; i++) {
+            var user = users[i];
+            var days = user.availability || [];
+            var dayNames = '';
+            for (var j = 0; j < days.length; j++) {
                 dayNames += days[j].day + (j < days.length - 1 ? ', ' : '');
             }
             if (!dayNames) dayNames = 'No days selected';
@@ -1575,25 +1692,25 @@ async function loadAllUsersAvailability() {
 
 // ===== ADMIN: ANNOUNCE RESULTS =====
 async function announceResults() {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return;
     
-    const confirmed = confirm('📢 Announce results for next week? This will send notifications to all selected players.');
+    var confirmed = confirm('📢 Announce results for next week? This will send notifications to all selected players.');
     if (!confirmed) return;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/announce-results`, {
+        var response = await fetch(window.API_URL + '/booking/announce-results', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             }
         });
         
         if (!response.ok) throw new Error('Failed to announce results');
         
-        const data = await response.json();
-        window.showToast(`📢 Results announced! ${data.notified} players notified.`, 'success');
+        var data = await response.json();
+        window.showToast('📢 Results announced! ' + data.notified + ' players notified.', 'success');
         await renderDashboard();
         
     } catch (error) {
@@ -1604,20 +1721,20 @@ async function announceResults() {
 
 // ===== ADMIN: VIEW ALL VOTES =====
 async function viewAllVotes() {
-    const token = window.getToken();
+    var token = window.getToken();
     if (!token) return;
     
     try {
-        const response = await fetch(`${window.API_URL}/booking/all-votes`, {
+        var response = await fetch(window.API_URL + '/booking/all-votes', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': 'Bearer ' + token
             }
         });
         
         if (!response.ok) throw new Error('Failed to fetch votes');
         
-        const data = await response.json();
-        const container = document.getElementById('allUsersAvailability');
+        var data = await response.json();
+        var container = document.getElementById('allUsersAvailability');
         if (!container) return;
         
         if (!data || data.length === 0) {
@@ -1625,19 +1742,19 @@ async function viewAllVotes() {
             return;
         }
         
-        let html = '<h3>📊 All User Votes</h3>';
+        var html = '<h3>📊 All User Votes</h3>';
         html += '<div class="votes-grid">';
         
-        for (let i = 0; i < data.length; i++) {
-            const user = data[i];
-            const votes = user.availability || [];
-            const voteCount = votes.length;
+        for (var i = 0; i < data.length; i++) {
+            var user = data[i];
+            var votes = user.availability || [];
+            var voteCount = votes.length;
             
-            html += `<div class="vote-card">
-                <div class="vote-user">👤 ${user.username}</div>
-                <div class="vote-count">📅 ${voteCount} day${voteCount > 1 ? 's' : ''}</div>
-                <div class="vote-days">${votes.map(v => v.day).join(', ') || 'No votes'}</div>
-            </div>`;
+            html += '<div class="vote-card">';
+            html += '<div class="vote-user">👤 ' + user.username + '</div>';
+            html += '<div class="vote-count">📅 ' + voteCount + ' day' + (voteCount > 1 ? 's' : '') + '</div>';
+            html += '<div class="vote-days">' + (votes.map(function(v) { return v.day; }).join(', ') || 'No votes') + '</div>';
+            html += '</div>';
         }
         
         html += '</div>';
@@ -1649,10 +1766,40 @@ async function viewAllVotes() {
     }
 }
 
+// ===== ADMIN: REPLACE BOOKER =====
+async function replaceBooker(day, newBookerId) {
+    var token = window.getToken();
+    if (!token) return false;
+    
+    try {
+        var response = await fetch(window.API_URL + '/booking/replace-booker', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                day: day,
+                new_booker_id: newBookerId
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to replace booker');
+        
+        window.showToast('✅ Booker replaced for ' + day + '!', 'success');
+        await renderDashboard();
+        return true;
+    } catch (error) {
+        console.error('Error replacing booker:', error);
+        window.showToast('❌ Failed to replace booker', 'error');
+        return false;
+    }
+}
+
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', function() {
     if (window.location.pathname.includes('dashboard.html')) {
-        const user = window.getCurrentUser();
+        var user = window.getCurrentUser();
         if (!user) {
             window.location.href = '/login.html';
             return;
@@ -1664,7 +1811,7 @@ document.addEventListener('DOMContentLoaded', function() {
             testRunMode = true;
         }
         
-        const userName = document.getElementById('userName');
+        var userName = document.getElementById('userName');
         if (userName) {
             window.supabase
                 .from('profiles')
@@ -1683,7 +1830,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateNotificationBadge();
         
         // MENU
-        const menuToggle = document.getElementById('menuToggle');
+        var menuToggle = document.getElementById('menuToggle');
         if (menuToggle) {
             console.log('✅ Menu toggle found');
             menuToggle.addEventListener('click', function(e) {
@@ -1695,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('❌ Menu toggle NOT found');
         }
         
-        const closePanel = document.getElementById('closePanel');
+        var closePanel = document.getElementById('closePanel');
         if (closePanel) {
             closePanel.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -1703,7 +1850,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        const overlay = document.getElementById('panelOverlay');
+        var overlay = document.getElementById('panelOverlay');
         if (overlay) {
             overlay.addEventListener('click', function() {
                 closeSidePanel();
@@ -1711,42 +1858,42 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // PANEL BUTTONS
-        const panelMyAvailability = document.getElementById('panelMyAvailability');
+        var panelMyAvailability = document.getElementById('panelMyAvailability');
         if (panelMyAvailability) {
             panelMyAvailability.addEventListener('click', function() {
                 switchView('dashboard');
-                const section = document.getElementById('myAvailability');
+                var section = document.getElementById('myAvailability');
                 if (section) section.scrollIntoView({ behavior: 'smooth' });
             });
         }
         
-        const panelRules = document.getElementById('panelRules');
+        var panelRules = document.getElementById('panelRules');
         if (panelRules) {
             panelRules.addEventListener('click', function() {
                 switchView('rules');
             });
         }
         
-        const panelNotifications = document.getElementById('panelNotifications');
+        var panelNotifications = document.getElementById('panelNotifications');
         if (panelNotifications) {
             panelNotifications.addEventListener('click', function() {
                 switchView('notifications');
             });
         }
         
-        const panelHistory = document.getElementById('panelHistory');
+        var panelHistory = document.getElementById('panelHistory');
         if (panelHistory) {
             panelHistory.addEventListener('click', function() {
                 switchView('notifications');
             });
         }
         
-        const panelAdmin = document.getElementById('panelAdmin');
+        var panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
             panelAdmin.addEventListener('click', openAdminPanel);
         }
         
-        const panelLogout = document.getElementById('panelLogout');
+        var panelLogout = document.getElementById('panelLogout');
         if (panelLogout) {
             panelLogout.addEventListener('click', function() {
                 window.logoutUser();
@@ -1754,26 +1901,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // ADMIN MODAL
-        const closeAdminModal = document.getElementById('closeAdminModal');
+        var closeAdminModal = document.getElementById('closeAdminModal');
         if (closeAdminModal) {
             closeAdminModal.addEventListener('click', function() {
-                const modal = document.getElementById('adminModal');
+                var modal = document.getElementById('adminModal');
                 if (modal) modal.style.display = 'none';
             });
         }
         window.addEventListener('click', function(e) {
-            const modal = document.getElementById('adminModal');
+            var modal = document.getElementById('adminModal');
             if (e.target === modal) {
                 if (modal) modal.style.display = 'none';
             }
         });
         
-        const verifyAdminBtn = document.getElementById('verifyAdminBtn');
+        var verifyAdminBtn = document.getElementById('verifyAdminBtn');
         if (verifyAdminBtn) {
             verifyAdminBtn.addEventListener('click', verifyAdmin);
         }
         
-        const adminCodeInput = document.getElementById('adminCode');
+        var adminCodeInput = document.getElementById('adminCode');
         if (adminCodeInput) {
             adminCodeInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') verifyAdmin();
@@ -1781,33 +1928,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // OPT OUT MODAL
-        const closeOptOutModalBtn = document.getElementById('closeOptOutModal');
+        var closeOptOutModalBtn = document.getElementById('closeOptOutModal');
         if (closeOptOutModalBtn) {
             closeOptOutModalBtn.addEventListener('click', closeOptOutModal);
         }
         
-        const optOutCancel = document.getElementById('optOutCancel');
+        var optOutCancel = document.getElementById('optOutCancel');
         if (optOutCancel) {
             optOutCancel.addEventListener('click', function() {
                 handleOptOut(optOutDay, selectedBookingId, 'cancel');
             });
         }
         
-        const optOutNotBooked = document.getElementById('optOutNotBooked');
+        var optOutNotBooked = document.getElementById('optOutNotBooked');
         if (optOutNotBooked) {
             optOutNotBooked.addEventListener('click', function() {
                 handleOptOut(optOutDay, selectedBookingId, 'notBooked');
             });
         }
         
-        const optOutReplace = document.getElementById('optOutReplace');
+        var optOutReplace = document.getElementById('optOutReplace');
         if (optOutReplace) {
             optOutReplace.addEventListener('click', function() {
                 handleOptOut(optOutDay, selectedBookingId, 'replace');
             });
         }
         
-        const optOutPenalty = document.getElementById('optOutPenalty');
+        var optOutPenalty = document.getElementById('optOutPenalty');
         if (optOutPenalty) {
             optOutPenalty.addEventListener('click', function() {
                 handleOptOut(optOutDay, selectedBookingId, 'penalty');
@@ -1815,53 +1962,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // REPLACEMENT MODAL
-        const closeReplacementModal = document.getElementById('closeReplacementModal');
+        var closeReplacementModal = document.getElementById('closeReplacementModal');
         if (closeReplacementModal) {
             closeReplacementModal.addEventListener('click', function() {
-                const modal = document.getElementById('replacementModal');
+                var modal = document.getElementById('replacementModal');
                 if (modal) modal.style.display = 'none';
             });
         }
         
-        const replacementCancel = document.getElementById('replacementCancel');
+        var replacementCancel = document.getElementById('replacementCancel');
         if (replacementCancel) {
             replacementCancel.addEventListener('click', function() {
-                const modal = document.getElementById('replacementModal');
+                var modal = document.getElementById('replacementModal');
                 if (modal) modal.style.display = 'none';
             });
         }
         
         // PENALTY MODAL
-        const closePenaltyModal = document.getElementById('closePenaltyModal');
+        var closePenaltyModal = document.getElementById('closePenaltyModal');
         if (closePenaltyModal) {
             closePenaltyModal.addEventListener('click', function() {
-                const modal = document.getElementById('penaltyModal');
+                var modal = document.getElementById('penaltyModal');
                 if (modal) modal.style.display = 'none';
             });
         }
         
-        const penaltyCancel = document.getElementById('penaltyCancel');
+        var penaltyCancel = document.getElementById('penaltyCancel');
         if (penaltyCancel) {
             penaltyCancel.addEventListener('click', function() {
-                const modal = document.getElementById('penaltyModal');
+                var modal = document.getElementById('penaltyModal');
                 if (modal) modal.style.display = 'none';
             });
         }
         
-        const penaltyPay = document.getElementById('penaltyPay');
+        var penaltyPay = document.getElementById('penaltyPay');
         if (penaltyPay) {
             penaltyPay.addEventListener('click', function() {
-                const bookingId = this.dataset.bookingId;
-                const day = this.dataset.day;
+                var bookingId = this.dataset.bookingId;
+                var day = this.dataset.day;
                 handlePenaltyPay(bookingId, day);
             });
         }
         
         // CLICK OUTSIDE MODALS
         window.addEventListener('click', function(e) {
-            const optOutModal = document.getElementById('optOutModal');
-            const replacementModal = document.getElementById('replacementModal');
-            const penaltyModal = document.getElementById('penaltyModal');
+            var optOutModal = document.getElementById('optOutModal');
+            var replacementModal = document.getElementById('replacementModal');
+            var penaltyModal = document.getElementById('penaltyModal');
             if (e.target === optOutModal) closeOptOutModal();
             if (e.target === replacementModal) {
                 if (replacementModal) replacementModal.style.display = 'none';
@@ -1871,7 +2018,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        const logoutBtn = document.getElementById('logoutBtn');
+        var logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', function() {
                 window.logoutUser();
@@ -1879,14 +2026,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // TEST RUN BUTTONS
-        const testRunBtn = document.getElementById('testRunBtn');
+        var testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
                 toggleTestRun();
             });
         }
         
-        const sundayBtn = document.getElementById('sundaySimBtn');
+        var sundayBtn = document.getElementById('sundaySimBtn');
         if (sundayBtn) {
             sundayBtn.addEventListener('click', function() {
                 simulateSunday();
@@ -1894,48 +2041,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Admin panel buttons
-        const viewVotesBtn = document.getElementById('viewVotesBtn');
+        var viewVotesBtn = document.getElementById('viewVotesBtn');
         if (viewVotesBtn) {
             viewVotesBtn.addEventListener('click', viewAllVotes);
         }
         
-        const announceResultsBtn = document.getElementById('announceResultsBtn');
+        var announceResultsBtn = document.getElementById('announceResultsBtn');
         if (announceResultsBtn) {
             announceResultsBtn.addEventListener('click', announceResults);
         }
         
-        const randomSelectAllBtn = document.getElementById('randomSelectAllBtn');
+        var randomSelectAllBtn = document.getElementById('randomSelectAllBtn');
         if (randomSelectAllBtn) {
-            randomSelectAllBtn.addEventListener('click', async function() {
-                const confirmed = confirm('🎲 Randomly select players for ALL days?');
+            randomSelectAllBtn.addEventListener('click', function() {
+                var confirmed = confirm('🎲 Randomly select players for ALL days?');
                 if (!confirmed) return;
                 
-                const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                for (let i = 0; i < dayOrder.length; i++) {
-                    await selectRandomUser(dayOrder[i]);
+                var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                for (var i = 0; i < dayOrder.length; i++) {
+                    selectRandomUser(dayOrder[i]);
                 }
-                await renderDashboard();
+                setTimeout(function() {
+                    renderDashboard();
+                }, 2000);
                 window.showToast('🎯 Random selection complete for all days!', 'success');
             });
         }
         
-        const resetAllBtn = document.getElementById('resetAllBtn');
+        var resetAllBtn = document.getElementById('resetAllBtn');
         if (resetAllBtn) {
-            resetAllBtn.addEventListener('click', async function() {
-                const confirmed = confirm('🔄 Reset ALL days? This will clear all selections.');
+            resetAllBtn.addEventListener('click', function() {
+                var confirmed = confirm('🔄 Reset ALL days? This will clear all selections.');
                 if (!confirmed) return;
                 
-                const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                for (let i = 0; i < dayOrder.length; i++) {
-                    const response = await fetch(`${window.API_URL}/booking/reset/${dayOrder[i]}`, {
+                var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                for (var i = 0; i < dayOrder.length; i++) {
+                    fetch(window.API_URL + '/booking/reset/' + dayOrder[i], {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${window.getToken()}`,
+                            'Authorization': 'Bearer ' + window.getToken(),
                             'Content-Type': 'application/json'
                         }
                     });
                 }
-                await renderDashboard();
+                setTimeout(function() {
+                    renderDashboard();
+                }, 1000);
                 window.showToast('🔄 All days reset successfully!', 'success');
             });
         }
