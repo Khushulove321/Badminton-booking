@@ -1,4 +1,4 @@
-// Booking functions - With Enhanced Notifications
+// Booking functions - With Full Notification System
 
 console.log('📚 booking.js loaded');
 
@@ -7,433 +7,11 @@ let optOutDay = null;
 let selectedBookingId = null;
 let currentUser = null;
 let currentView = 'dashboard';
-
-// ===== ADMIN EXCLUSION FUNCTIONS =====
-function isAdminUser(user) {
-  if (!user) return false;
-  if (user.email === 'admin@gmail.com') return true;
-  if (user.username === 'admin') return true;
-  return false;
-}
-
-// ===== NOTIFICATION DETAIL FUNCTIONS =====
-async function getNotificationDetails(notificationId) {
-  const token = window.getToken();
-  if (!token) return null;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/notification-details`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ notification_id: notificationId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch notification details');
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching notification details:', error);
-    return null;
-  }
-}
-
-async function openNotificationDetail(notificationId) {
-  console.log('🔍 Opening notification detail:', notificationId);
-  
-  const modal = document.getElementById('notificationDetailModal');
-  const content = document.getElementById('notificationDetailContent');
-  
-  if (!modal || !content) return;
-  
-  modal.style.display = 'flex';
-  content.innerHTML = 'Loading...';
-  
-  try {
-    const details = await getNotificationDetails(notificationId);
-    
-    if (!details) {
-      content.innerHTML = '<p style="color: red;">Failed to load notification details.</p>';
-      return;
-    }
-    
-    let html = `
-      <div style="padding: 10px;">
-        <h3>📋 Notification Details</h3>
-        <hr style="margin: 15px 0;">
-        <div style="margin-bottom: 12px;">
-          <strong>Title:</strong> ${details.title || 'N/A'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Message:</strong> ${details.message || 'N/A'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Date:</strong> ${details.date ? new Date(details.date).toLocaleDateString() : 'N/A'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Time:</strong> ${details.time ? new Date(details.time).toLocaleTimeString() : 'N/A'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Day:</strong> ${details.day || 'N/A'}
-        </div>
-    `;
-    
-    // Show additional details based on type
-    if (details.type === 'penalty') {
-      html += `
-        <div style="margin-bottom: 12px;">
-          <strong>Penalty Amount:</strong> $${details.amount || '10.00'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Status:</strong> ${details.penalty_status || 'Pending'}
-        </div>
-        ${details.paid_at ? `<div style="margin-bottom: 12px;"><strong>Paid On:</strong> ${new Date(details.paid_at).toLocaleDateString()} at ${new Date(details.paid_at).toLocaleTimeString()}</div>` : ''}
-        <div style="margin-bottom: 12px;">
-          <strong>Reason:</strong> ${details.reason || 'Cancelled after court was booked'}
-        </div>
-      `;
-    } else if (details.type === 'replacement') {
-      html += `
-        <div style="margin-bottom: 12px;">
-          <strong>Original User:</strong> ${details.original_user || 'N/A'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Replacement User:</strong> ${details.replacement_user || 'N/A'}
-        </div>
-        <div style="margin-bottom: 12px;">
-          <strong>Status:</strong> ${details.replacement_status || 'Pending'}
-        </div>
-        ${details.approved_at ? `<div style="margin-bottom: 12px;"><strong>Approved On:</strong> ${new Date(details.approved_at).toLocaleDateString()} at ${new Date(details.approved_at).toLocaleTimeString()}</div>` : ''}
-      `;
-    } else if (details.type === 'info') {
-      html += `
-        <div style="margin-bottom: 12px;">
-          <strong>Description:</strong> ${details.description || 'N/A'}
-        </div>
-      `;
-    }
-    
-    html += `
-        <hr style="margin: 15px 0;">
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button onclick="document.getElementById('notificationDetailModal').style.display='none'" class="btn btn-secondary btn-sm">Close</button>
-        </div>
-      </div>
-    `;
-    
-    content.innerHTML = html;
-    
-  } catch (error) {
-    console.error('Error loading notification details:', error);
-    content.innerHTML = '<p style="color: red;">Failed to load notification details. Please try again.</p>';
-  }
-}
-
-// ===== NOTIFICATION FUNCTIONS =====
-async function createNotification(userId, title, message, type = 'info', relatedId = null) {
-  const token = window.getToken();
-  if (!token) return false;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/create-notification`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        title: title,
-        message: message,
-        type: type,
-        related_id: relatedId
-      })
-    });
-    
-    if (!response.ok) throw new Error('Failed to create notification');
-    console.log('✅ Notification created for user:', userId);
-    return true;
-  } catch (error) {
-    console.error('Error creating notification:', error);
-    return false;
-  }
-}
-
-async function getUnreadCount() {
-  const token = window.getToken();
-  if (!token) return 0;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/unread-count`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to get unread count');
-    const data = await response.json();
-    return data.count || 0;
-  } catch (error) {
-    console.error('Error getting unread count:', error);
-    return 0;
-  }
-}
-
-async function loadNotifications() {
-  const container = document.getElementById('notificationsList');
-  if (!container) return;
-  
-  const token = window.getToken();
-  if (!token) {
-    container.innerHTML = '<p style="color: #888;">Please login to view notifications.</p>';
-    return;
-  }
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/my-notifications`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch notifications');
-    
-    const notifications = await response.json();
-    
-    if (!notifications || notifications.length === 0) {
-      container.innerHTML = '<p style="color: #888;">🎉 No notifications.</p>';
-      return;
-    }
-    
-    let html = '<h3>🔔 Your Notifications</h3>';
-    html += '<p style="color: #666;margin-bottom:20px;">You have ' + notifications.filter(n => !n.is_read).length + ' unread notification(s).</p>';
-    
-    for (let i = 0; i < notifications.length; i++) {
-      const n = notifications[i];
-      const isRead = n.is_read ? 'read' : 'unread';
-      const typeColor = n.type === 'penalty' ? '#fc8181' : 
-                        n.type === 'replacement' ? '#ed8936' : 
-                        n.type === 'warning' ? '#f6e05e' : '#667eea';
-      const typeIcon = n.type === 'penalty' ? '💰' : 
-                       n.type === 'replacement' ? '🔄' : 
-                       n.type === 'warning' ? '⚠️' : 'ℹ️';
-      
-      html += `
-        <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor}; ${isRead ? 'opacity: 0.7;' : ''}">
-          <div class="notification-icon">${typeIcon}</div>
-          <div class="notification-content">
-            <div class="notification-title">${n.title}</div>
-            <div class="notification-details">${n.message}</div>
-            <div class="notification-date">${new Date(n.created_at).toLocaleString()}</div>
-            <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
-              ${!isRead ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${n.id}">Mark as Read</button>` : ''}
-              <button class="btn btn-sm btn-info more-info-btn" data-id="${n.id}">📖 More Info</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-    
-    container.innerHTML = html;
-    
-    const markBtns = container.querySelectorAll('.mark-read-btn');
-    for (let i = 0; i < markBtns.length; i++) {
-      markBtns[i].addEventListener('click', async function() {
-        const id = this.dataset.id;
-        await markNotificationRead(id);
-      });
-    }
-    
-    const infoBtns = container.querySelectorAll('.more-info-btn');
-    for (let i = 0; i < infoBtns.length; i++) {
-      infoBtns[i].addEventListener('click', function() {
-        const id = this.dataset.id;
-        openNotificationDetail(id);
-      });
-    }
-    
-    const unreadCount = notifications.filter(n => !n.is_read).length;
-    updateNotificationBadge(unreadCount);
-    
-  } catch (error) {
-    console.error('Error loading notifications:', error);
-    container.innerHTML = '<p style="color: red;">Failed to load notifications.</p>';
-  }
-}
-
-async function markNotificationRead(notificationId) {
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/notification-read`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ notification_id: notificationId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to mark as read');
-    
-    await loadNotifications();
-    await updateNotificationBadge();
-  } catch (error) {
-    console.error('Error marking notification read:', error);
-  }
-}
-
-async function updateNotificationBadge(count) {
-  const badge = document.getElementById('notificationBadge');
-  if (!badge) return;
-  
-  if (count === undefined) {
-    count = await getUnreadCount();
-  }
-  
-  if (count > 0) {
-    badge.style.display = 'inline-block';
-    badge.textContent = count;
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-// ===== PENDING REPLACEMENTS =====
-async function getPendingReplacements() {
-  const token = window.getToken();
-  if (!token) return [];
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/pending-replacements`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch pending replacements');
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching pending replacements:', error);
-    return [];
-  }
-}
-
-async function acceptReplacement(replacementId) {
-  const token = window.getToken();
-  if (!token) return false;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/accept-replacement`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ replacement_id: replacementId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to accept replacement');
-    window.showToast('✅ Replacement accepted!', 'success');
-    return true;
-  } catch (error) {
-    console.error('Error accepting replacement:', error);
-    window.showToast('❌ Failed to accept replacement', 'error');
-    return false;
-  }
-}
-
-async function declineReplacement(replacementId) {
-  const token = window.getToken();
-  if (!token) return false;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/decline-replacement`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ replacement_id: replacementId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to decline replacement');
-    window.showToast('✅ Replacement declined', 'success');
-    return true;
-  } catch (error) {
-    console.error('Error declining replacement:', error);
-    window.showToast('❌ Failed to decline replacement', 'error');
-    return false;
-  }
-}
-
-async function requestReplacement(originalUserId, replacementUserId, day) {
-  const token = window.getToken();
-  if (!token) return false;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/request-replacement`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        original_user_id: originalUserId,
-        replacement_user_id: replacementUserId,
-        day: day
-      })
-    });
-    
-    if (!response.ok) throw new Error('Failed to request replacement');
-    window.showToast('✅ Replacement request sent!', 'success');
-    return true;
-  } catch (error) {
-    console.error('Error requesting replacement:', error);
-    window.showToast('❌ Failed to request replacement', 'error');
-    return false;
-  }
-}
-
-// ===== HISTORY RECORDING FUNCTION =====
-async function recordHistory(event_date, action_type, day, description, amount = 0, related_user = null) {
-  const token = window.getToken();
-  if (!token) return false;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/booking/record-history`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        event_date: event_date,
-        action_type: action_type,
-        day: day,
-        description: description,
-        amount: amount,
-        related_user: related_user
-      })
-    });
-    
-    if (!response.ok) throw new Error('Failed to record history');
-    console.log('✅ History recorded:', action_type, day);
-    return true;
-  } catch (error) {
-    console.error('Error recording history:', error);
-    return false;
-  }
-}
-
-// ===== TEST RUN MODE (ADMIN ONLY) =====
 let testRunMode = false;
 let testRunDay = 1;
 let isAdmin = false;
 
-// Sample users for simulation
+// ===== SAMPLE USERS FOR SIMULATION =====
 const SAMPLE_USERS = [
     { id: 'user1', username: 'john_doe', full_name: 'John Doe' },
     { id: 'user2', username: 'jane_smith', full_name: 'Jane Smith' },
@@ -444,6 +22,343 @@ const SAMPLE_USERS = [
     { id: 'user7', username: 'mike_miller', full_name: 'Mike Miller' },
 ];
 
+// ===== ADMIN EXCLUSION FUNCTIONS =====
+function isAdminUser(user) {
+    if (!user) return false;
+    if (user.email === 'admin@gmail.com') return true;
+    if (user.username === 'admin') return true;
+    return false;
+}
+
+// ===== VOTING SCHEDULE FUNCTIONS - TEST MODE (ALWAYS OPEN) =====
+function isVotingWindowOpen() {
+    // 🔓 TEST MODE: Always open for testing
+    return true;
+}
+
+function getVotingStatus() {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[currentDay];
+    
+    return {
+        status: 'open',
+        message: `🔓 TEST MODE: Voting OPEN (${dayName}) - Click to select days`,
+        className: 'open'
+    };
+}
+
+function canEdit() {
+    // 🔓 TEST MODE: Always allow editing
+    return true;
+}
+
+function getWeekType() {
+    return 'next';
+}
+
+function getVotingDeadline() {
+    const now = new Date();
+    const wednesday = new Date(now);
+    wednesday.setDate(now.getDate() + 3);
+    wednesday.setHours(23, 59, 59, 999);
+    return wednesday;
+}
+
+function getResultsDay() {
+    const now = new Date();
+    const thursday = new Date(now);
+    thursday.setDate(now.getDate() + 4);
+    thursday.setHours(0, 0, 0, 0);
+    return thursday;
+}
+
+// ===== NOTIFICATION FUNCTIONS =====
+async function createNotification(userId, title, message, type = 'info', relatedId = null) {
+    const token = window.getToken();
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/create-notification`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                title: title,
+                message: message,
+                type: type,
+                related_id: relatedId
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to create notification');
+        console.log('✅ Notification created for user:', userId);
+        return true;
+    } catch (error) {
+        console.error('Error creating notification:', error);
+        return false;
+    }
+}
+
+async function getUnreadCount() {
+    const token = window.getToken();
+    if (!token) return 0;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/unread-count`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to get unread count');
+        const data = await response.json();
+        return data.count || 0;
+    } catch (error) {
+        console.error('Error getting unread count:', error);
+        return 0;
+    }
+}
+
+async function loadNotifications() {
+    const container = document.getElementById('notificationsList');
+    if (!container) return;
+    
+    const token = window.getToken();
+    if (!token) {
+        container.innerHTML = '<p style="color: #888;">Please login to view notifications.</p>';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/my-notifications`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch notifications');
+        
+        const notifications = await response.json();
+        
+        if (!notifications || notifications.length === 0) {
+            container.innerHTML = '<p style="color: #888;">🎉 No notifications.</p>';
+            return;
+        }
+        
+        let html = '<h3>🔔 Your Notifications</h3>';
+        html += '<p style="color: #666;margin-bottom:20px;">You have ' + notifications.filter(n => !n.is_read).length + ' unread notification(s).</p>';
+        
+        for (let i = 0; i < notifications.length; i++) {
+            const n = notifications[i];
+            const isRead = n.is_read ? 'read' : 'unread';
+            const typeColor = n.type === 'penalty' ? '#fc8181' : 
+                              n.type === 'replacement' ? '#ed8936' : 
+                              n.type === 'warning' ? '#f6e05e' : '#667eea';
+            
+            html += `
+                <div class="notification-item ${isRead}" style="border-left: 4px solid ${typeColor}; ${isRead ? 'opacity: 0.7;' : ''}">
+                    <div class="notification-icon">${n.type === 'penalty' ? '💰' : n.type === 'replacement' ? '🔄' : n.type === 'warning' ? '⚠️' : 'ℹ️'}</div>
+                    <div class="notification-content">
+                        <div class="notification-title">${n.title}</div>
+                        <div class="notification-details">${n.message}</div>
+                        <div class="notification-date">${new Date(n.created_at).toLocaleString()}</div>
+                        ${!isRead ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${n.id}">Mark as Read</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+        
+        const markBtns = container.querySelectorAll('.mark-read-btn');
+        for (let i = 0; i < markBtns.length; i++) {
+            markBtns[i].addEventListener('click', async function() {
+                const id = this.dataset.id;
+                await markNotificationRead(id);
+            });
+        }
+        
+        const unreadCount = notifications.filter(n => !n.is_read).length;
+        updateNotificationBadge(unreadCount);
+        
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+        container.innerHTML = '<p style="color: red;">Failed to load notifications.</p>';
+    }
+}
+
+async function markNotificationRead(notificationId) {
+    const token = window.getToken();
+    if (!token) return;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/notification-read`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ notification_id: notificationId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to mark as read');
+        
+        await loadNotifications();
+        await updateNotificationBadge();
+    } catch (error) {
+        console.error('Error marking notification read:', error);
+    }
+}
+
+async function updateNotificationBadge(count) {
+    const badge = document.getElementById('notificationBadge');
+    if (!badge) return;
+    
+    if (count === undefined) {
+        count = await getUnreadCount();
+    }
+    
+    if (count > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = count;
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// ===== PENDING REPLACEMENTS =====
+async function getPendingReplacements() {
+    const token = window.getToken();
+    if (!token) return [];
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/pending-replacements`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch pending replacements');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching pending replacements:', error);
+        return [];
+    }
+}
+
+async function acceptReplacement(replacementId) {
+    const token = window.getToken();
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/accept-replacement`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ replacement_id: replacementId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to accept replacement');
+        window.showToast('✅ Replacement accepted!', 'success');
+        return true;
+    } catch (error) {
+        console.error('Error accepting replacement:', error);
+        window.showToast('❌ Failed to accept replacement', 'error');
+        return false;
+    }
+}
+
+async function declineReplacement(replacementId) {
+    const token = window.getToken();
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/decline-replacement`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ replacement_id: replacementId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to decline replacement');
+        window.showToast('✅ Replacement declined', 'success');
+        return true;
+    } catch (error) {
+        console.error('Error declining replacement:', error);
+        window.showToast('❌ Failed to decline replacement', 'error');
+        return false;
+    }
+}
+
+async function requestReplacement(originalUserId, replacementUserId, day) {
+    const token = window.getToken();
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/request-replacement`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                original_user_id: originalUserId,
+                replacement_user_id: replacementUserId,
+                day: day
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to request replacement');
+        window.showToast('✅ Replacement request sent!', 'success');
+        return true;
+    } catch (error) {
+        console.error('Error requesting replacement:', error);
+        window.showToast('❌ Failed to request replacement', 'error');
+        return false;
+    }
+}
+
+// ===== HISTORY RECORDING FUNCTION =====
+async function recordHistory(event_date, action_type, day, description, amount = 0, related_user = null) {
+    const token = window.getToken();
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/record-history`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_date: event_date,
+                action_type: action_type,
+                day: day,
+                description: description,
+                amount: amount,
+                related_user: related_user
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to record history');
+        console.log('✅ History recorded:', action_type, day);
+        return true;
+    } catch (error) {
+        console.error('Error recording history:', error);
+        return false;
+    }
+}
+
+// ===== TEST RUN MODE =====
 function getSimulatedThisWeekBookers() {
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const shuffled = [...SAMPLE_USERS].sort(() => Math.random() - 0.5);
@@ -463,11 +378,6 @@ function getSimulatedNextWeekBookers() {
 }
 
 function toggleTestRun() {
-    if (!isAdmin) {
-        window.showToast('❌ Admin access required', 'error');
-        return;
-    }
-    
     const wasActive = testRunMode;
     if (wasActive) {
         testRunMode = false;
@@ -483,10 +393,6 @@ function toggleTestRun() {
             btn.className = 'btn btn-warning btn-sm';
         }
         window.showToast('🔴 Test Run disabled', 'info');
-        const typeEl = document.getElementById('testRunType');
-        if (typeEl) {
-            typeEl.textContent = '';
-        }
         localStorage.removeItem('simulateSunday');
     } else {
         testRunMode = true;
@@ -508,11 +414,6 @@ function toggleTestRun() {
 }
 
 function simulateSunday() {
-    if (!isAdmin) {
-        window.showToast('❌ Admin access required', 'error');
-        return;
-    }
-    
     testRunMode = true;
     localStorage.setItem('testRunMode', 'true');
     localStorage.setItem('simulateSunday', 'true');
@@ -527,132 +428,34 @@ function simulateSunday() {
         btn.textContent = '🔴 Disable Test Run';
         btn.className = 'btn btn-danger btn-sm';
     }
-    const typeEl = document.getElementById('testRunType');
-    if (typeEl) {
-        typeEl.textContent = 'Sunday Simulation - Final Court Bookers (ADMIN ONLY)';
-        typeEl.style.color = '#f56565';
-    }
     window.showToast('🧪 Sunday Simulation activated - Showing simulated court bookers!', 'success');
     renderDashboard();
 }
 
-// ===== DATE FUNCTIONS =====
-function getNextWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    let daysUntilNextMonday;
-    if (currentDay === 0) {
-        daysUntilNextMonday = 1;
-    } else if (currentDay === 1) {
-        daysUntilNextMonday = 7;
-    } else {
-        daysUntilNextMonday = 8 - currentDay;
+function disableSimulation() {
+    testRunMode = false;
+    localStorage.removeItem('testRunMode');
+    localStorage.removeItem('simulateSunday');
+    const statusEl = document.getElementById('testRunStatus');
+    if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '#666';
     }
-    const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(nextMonday);
-        date.setDate(nextMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
+    const btn = document.getElementById('testRunBtn');
+    if (btn) {
+        btn.textContent = '🧪 Test Run';
+        btn.className = 'btn btn-warning btn-sm';
     }
-    return weekDates;
+    renderDashboard();
 }
 
-function getThisWeekDates() {
-    const today = new Date();
-    const currentDay = today.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const thisMonday = new Date(today);
-    thisMonday.setDate(today.getDate() - daysToMonday);
-    const weekDates = [];
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(thisMonday);
-        date.setDate(thisMonday.getDate() + i);
-        weekDates.push({
-            day: dayNames[i],
-            date: date,
-            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        });
-    }
-    return weekDates;
-}
-
-function isSelectionWindowOpen() {
-    const now = new Date();
-    let day = now.getDay();
-    
-    if (testRunMode) {
-        const isSunday = localStorage.getItem('simulateSunday') === 'true';
-        if (isSunday) {
-            return false;
-        }
-        return true;
-    }
-    
-    return day === 1;
-}
-
-function getSelectionStatus() {
-    const now = new Date();
-    const day = now.getDay();
-    const isSunday = localStorage.getItem('simulateSunday') === 'true';
-    
-    if (testRunMode && isSunday && isAdmin) {
-        return {
-            status: 'sunday',
-            message: '🧪 TEST RUN: Simulating Sunday - FINAL COURT BOOKERS (ADMIN ONLY)',
-            className: 'sunday'
-        };
-    }
-    
-    if (testRunMode && isAdmin) {
-        return {
-            status: 'open',
-            message: '🧪 TEST RUN: Simulating Monday - Selection OPEN (ADMIN ONLY)',
-            className: 'open'
-        };
-    }
-    
-    if (day !== 1) {
-        const nextMonday = new Date(now);
-        const daysUntilMonday = day === 0 ? 1 : 8 - day;
-        nextMonday.setDate(now.getDate() + daysUntilMonday);
-        const dateStr = nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return {
-            status: 'closed',
-            message: '🔒 Selection opens Monday ' + dateStr + ' (all day)',
-            className: 'closed'
-        };
-    }
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
-    const diffMs = endOfDay - now;
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return {
-        status: 'open',
-        message: '🔓 Selection OPEN - ' + diffHrs + 'h ' + diffMin + 'm remaining',
-        className: 'open'
-    };
-}
-
-function canEdit() {
-    return isSelectionWindowOpen();
-}
-
-// ============ RULES DATA ============
+// ===== RULES DATA =====
 const RULES_DATA = [
     {
         category: '📋 Booking Rules',
         rules: [
-            'Selection opens every Monday (12:00 AM - 11:59 PM)',
+            'Voting opens every Sunday (12:00 AM)',
+            'Voting closes every Wednesday (11:59 PM)',
             'You must select your availability for the NEXT week',
             'You can select multiple days if you are available',
             'Once selected, you are committed to playing on that day',
@@ -688,18 +491,18 @@ const RULES_DATA = [
         ]
     },
     {
-        category: '📅 Selection Window',
+        category: '📅 Voting Schedule',
         rules: [
-            'Selection opens: Monday 12:00 AM',
-            'Selection closes: Monday 11:59 PM',
-            'You have 24 hours to make your selections',
-            'After closing, you can only view your selections',
-            'Selected players are chosen on Sunday night for the following week'
+            'Voting opens: Sunday 12:00 AM',
+            'Voting closes: Wednesday 11:59 PM',
+            'You have 4 days to make your selections',
+            'Results announced: Thursday morning',
+            'Selected players are chosen on Thursday for the following week'
         ]
     }
 ];
 
-// ============ MENU FUNCTIONS ============
+// ===== MENU FUNCTIONS =====
 function openSidePanel() {
     console.log('Opening side panel');
     const panel = document.getElementById('sidePanel');
@@ -720,12 +523,18 @@ function closeSidePanel() {
     if (overlay) overlay.classList.remove('active');
 }
 
-// ============ VIEW SWITCHING ============
+// ===== VIEW SWITCHING =====
 function switchView(view) {
     currentView = view;
-    document.getElementById('dashboardView').style.display = view === 'dashboard' ? 'block' : 'none';
-    document.getElementById('rulesView').style.display = view === 'rules' ? 'block' : 'none';
-    document.getElementById('notificationsView').style.display = view === 'notifications' ? 'block' : 'none';
+    const dashboardView = document.getElementById('dashboardView');
+    const rulesView = document.getElementById('rulesView');
+    const notificationsView = document.getElementById('notificationsView');
+    const historyView = document.getElementById('historyView');
+    
+    if (dashboardView) dashboardView.style.display = view === 'dashboard' ? 'block' : 'none';
+    if (rulesView) rulesView.style.display = view === 'rules' ? 'block' : 'none';
+    if (notificationsView) notificationsView.style.display = view === 'notifications' ? 'block' : 'none';
+    if (historyView) historyView.style.display = 'none';
     
     if (view === 'rules') renderRulesPage();
     if (view === 'notifications') {
@@ -735,7 +544,7 @@ function switchView(view) {
     closeSidePanel();
 }
 
-// ============ RULES PAGE ============
+// ===== RULES PAGE =====
 function renderRulesPage() {
     const container = document.querySelector('#rulesView .rules-content');
     if (!container) return;
@@ -755,7 +564,7 @@ function renderRulesPage() {
     container.innerHTML = html;
 }
 
-// ============ PENDING REPLACEMENTS IN NOTIFICATIONS ============
+// ===== PENDING REPLACEMENTS IN NOTIFICATIONS =====
 async function loadPendingReplacements() {
     const container = document.getElementById('pendingReplacements');
     if (!container) return;
@@ -832,7 +641,54 @@ async function loadPendingReplacements() {
     }
 }
 
-// ============ DASHBOARD FUNCTIONS ============
+// ===== DASHBOARD FUNCTIONS =====
+function getNextWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    let daysUntilNextMonday;
+    if (currentDay === 0) {
+        daysUntilNextMonday = 1;
+    } else if (currentDay === 1) {
+        daysUntilNextMonday = 7;
+    } else {
+        daysUntilNextMonday = 8 - currentDay;
+    }
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(nextMonday);
+        date.setDate(nextMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
+}
+
+function getThisWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysToMonday);
+    const weekDates = [];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(thisMonday);
+        date.setDate(thisMonday.getDate() + i);
+        weekDates.push({
+            day: dayNames[i],
+            date: date,
+            dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        });
+    }
+    return weekDates;
+}
+
 async function getAvailability(weekType) {
     const token = window.getToken();
     if (!token) return [];
@@ -857,7 +713,7 @@ async function toggleAvailability(day, date) {
         return;
     }
     if (!canEdit()) {
-        alert('❌ Selection window is CLOSED. It opens every Monday (all day).');
+        alert('❌ Voting window is CLOSED. It opens Sunday - Wednesday.');
         return;
     }
     try {
@@ -1049,7 +905,16 @@ async function recordPenalty(userId, bookingId) {
     }
 }
 
-// ============ RENDER FUNCTIONS ============
+function getBookedDays(bookings) {
+    const booked = [];
+    for (let i = 0; i < bookings.length; i++) {
+        if (bookings[i].is_booked) {
+            booked.push(bookings[i].day);
+        }
+    }
+    return booked;
+}
+
 function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
     const card = document.createElement('div');
     card.className = 'day-card';
@@ -1133,26 +998,22 @@ function renderMyAvailability(myAvailability, isBookedDays) {
     }
 }
 
-// ============ TWO WEEK TABLE ============
-async function renderTwoWeekTable() {
+// ===== TWO WEEK TABLE =====
+async function renderTwoWeekTable(isAdminUser) {
     const tbody = document.getElementById('selectedPlayersBody');
     if (!tbody) return;
     
-    // Check if Sunday indicator exists before trying to use it
-    const sundayIndicator = document.getElementById('sundayIndicator');
-    if (sundayIndicator) {
-        const isSunday = localStorage.getItem('simulateSunday') === 'true';
-        const isTestRun = localStorage.getItem('testRunMode') === 'true';
-        if (isSunday && isTestRun && isAdmin) {
-            sundayIndicator.style.display = 'inline';
-        } else {
-            sundayIndicator.style.display = 'none';
-        }
-    }
+    const isSunday = localStorage.getItem('simulateSunday') === 'true';
+    const isTestRun = localStorage.getItem('testRunMode') === 'true';
     
     const thisWeekDates = getThisWeekDates();
     const nextWeekDates = getNextWeekDates();
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    const sundayIndicator = document.getElementById('sundayIndicator');
+    if (sundayIndicator) {
+        sundayIndicator.style.display = (isSunday && isTestRun && isAdminUser) ? 'inline' : 'none';
+    }
     
     let thisWeekBookers = [];
     let nextWeekSelected = [];
@@ -1165,10 +1026,7 @@ async function renderTwoWeekTable() {
         nextWeekSelected = await getNextWeekSelected();
     } catch (e) { console.error('Error fetching next week selected:', e); }
     
-    // Only generate simulated data for admin test run
-    const isSunday = localStorage.getItem('simulateSunday') === 'true';
-    const isTestRun = localStorage.getItem('testRunMode') === 'true';
-    if (isSunday && isTestRun && isAdmin) {
+    if (isSunday && isTestRun && isAdminUser) {
         const simulatedThisWeek = getSimulatedThisWeekBookers();
         const simulatedNextWeek = getSimulatedNextWeekBookers();
         thisWeekBookers = simulatedThisWeek;
@@ -1209,13 +1067,11 @@ async function renderTwoWeekTable() {
     }
     
     if (!hasData) {
-        if (isAdmin) {
-            const isSunday2 = localStorage.getItem('simulateSunday') === 'true';
-            const isTestRun2 = localStorage.getItem('testRunMode') === 'true';
-            if (isSunday2 && isTestRun2) {
+        if (isAdminUser) {
+            if (isSunday && isTestRun) {
                 html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No simulated data available. Please make selections first.</td></tr>';
             } else {
-                html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Use Test Run to see a preview (Admin only).</td></tr>';
+                html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 No bookings yet. Click "Simulate Sunday" to see a preview.</td></tr>';
             }
         } else {
             html = '<tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 The court bookers are updated every Sunday and remain visible for the entire week.</td></tr>';
@@ -1225,93 +1081,84 @@ async function renderTwoWeekTable() {
     tbody.innerHTML = html;
 }
 
-function getBookedDays(bookings) {
-    const booked = [];
-    for (let i = 0; i < bookings.length; i++) {
-        if (bookings[i].is_booked) {
-            booked.push(bookings[i].day);
-        }
-    }
-    return booked;
-}
-
 function openOptOutModal(day, bookingId) {
     optOutDay = day;
     selectedBookingId = bookingId;
-    document.getElementById('optOutDay').textContent = day;
-    document.getElementById('optOutModal').style.display = 'flex';
+    const optOutDayEl = document.getElementById('optOutDay');
+    if (optOutDayEl) optOutDayEl.textContent = day;
+    const modal = document.getElementById('optOutModal');
+    if (modal) modal.style.display = 'flex';
 }
 
 function closeOptOutModal() {
-    document.getElementById('optOutModal').style.display = 'none';
+    const modal = document.getElementById('optOutModal');
+    if (modal) modal.style.display = 'none';
     optOutDay = null;
     selectedBookingId = null;
 }
 
+// ===== MAIN RENDER DASHBOARD =====
 async function renderDashboard() {
     const daysGrid = document.getElementById('daysGrid');
     if (!daysGrid) return;
     daysGrid.innerHTML = '<div class="loading">Loading availability...</div>';
+    
     try {
         const user = window.getCurrentUser();
         currentUser = user;
+        isAdmin = await window.checkAdmin();
         
-        // Check admin status with better error handling
-        try {
-            isAdmin = await window.checkAdmin();
-        } catch (error) {
-            console.error('Error checking admin:', error);
-            isAdmin = false;
+        const votingStatus = getVotingStatus();
+        const canEditBool = canEdit();
+        const weekType = getWeekType();
+        
+        const statusText = document.getElementById('votingStatusText');
+        if (statusText) {
+            statusText.className = 'timer-text ' + votingStatus.className;
+            statusText.textContent = votingStatus.message;
         }
         
-        const canEditBool = canEdit();
-        const selectionStatus = getSelectionStatus();
+        const votingForWeek = document.getElementById('votingForWeek');
+        if (votingForWeek) {
+            const weekDates = getNextWeekDates();
+            if (weekDates.length > 0) {
+                const start = weekDates[0].dateString;
+                const end = weekDates[6].dateString;
+                votingForWeek.textContent = `${start} - ${end}`;
+            }
+        }
+        
         const weekDisplay = document.getElementById('weekDisplay');
         if (weekDisplay) {
             const weekDates = getNextWeekDates();
             if (weekDates.length > 0) {
                 const start = weekDates[0].dateString;
                 const end = weekDates[6].dateString;
-                weekDisplay.textContent = '📅 Selecting for (Next Week): ' + start + ' - ' + end;
+                weekDisplay.textContent = `📅 Voting for: ${start} - ${end}`;
             }
         }
-        const statusContainer = document.getElementById('selectionStatus');
-        if (statusContainer) {
-            const indicator = statusContainer.querySelector('.status-indicator');
-            const text = statusContainer.querySelector('.status-text');
-            if (indicator && text) {
-                indicator.className = 'status-indicator ' + selectionStatus.className;
-                text.className = 'status-text ' + selectionStatus.className;
-                text.textContent = selectionStatus.message;
-            }
-        }
+        
         const warningBanner = document.getElementById('deadlineWarning');
         if (warningBanner) {
-            warningBanner.style.display = canEditBool ? 'none' : 'block';
+            warningBanner.style.display = 'none';
         }
         
         const adminControls = document.getElementById('adminControls');
         if (adminControls) {
-            if (isAdmin) {
-                adminControls.style.display = 'block';
-                const testControls = document.getElementById('adminTestControls');
-                if (testControls) testControls.style.display = 'flex';
-                const eraseControls = document.getElementById('adminEraseControls');
-                if (eraseControls) eraseControls.style.display = 'flex';
-            } else {
-                adminControls.style.display = 'none';
-            }
+            adminControls.style.display = isAdmin ? 'block' : 'none';
         }
-        
         const panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
             panelAdmin.style.display = isAdmin ? 'block' : 'none';
         }
-        const bookings = await getAvailability('next');
+        
+        const bookings = await getAvailability(weekType);
         const weekDates = getNextWeekDates();
         const bookedDays = getBookedDays(bookings);
+        
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const sortedBookings = [];
+        
         for (let i = 0; i < dayOrder.length; i++) {
             const day = dayOrder[i];
             let dateObj = null;
@@ -1346,6 +1193,7 @@ async function renderDashboard() {
                 date: dateObj ? dateObj.dateString : null
             });
         }
+        
         daysGrid.innerHTML = '';
         for (let i = 0; i < sortedBookings.length; i++) {
             const day = sortedBookings[i];
@@ -1353,11 +1201,15 @@ async function renderDashboard() {
             const card = renderDayCard(day, canEditBool, isBooked, user);
             daysGrid.appendChild(card);
         }
+        
         const myAvailability = await getMyAvailability();
         renderMyAvailability(myAvailability, bookedDays);
-        await renderTwoWeekTable();
+        
+        await renderTwoWeekTable(isAdmin);
+        
         await checkNotifications();
         await updateNotificationBadge();
+        
     } catch (error) {
         console.error('Error rendering dashboard:', error);
         daysGrid.innerHTML = '<div class="error-message">Failed to load availability. Please refresh.</div>';
@@ -1396,146 +1248,154 @@ async function handleToggleAvailability(day, date) {
     }
 }
 
-// ============ SELECT RANDOM WITH ADMIN EXCLUSION ============
+// ===== SELECT RANDOM WITH ADMIN EXCLUSION =====
 async function selectRandomUser(day) {
-  const token = window.getToken();
-  if (!token) {
-    window.location.href = '/login.html';
-    return;
-  }
-
-  try {
-    const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch availability');
-    const data = await response.json();
-    const booking = data.find(b => b.day === day);
-    
-    const availableUsers = booking?.available_users?.filter(u => u.email !== 'admin@gmail.com' && u.username !== 'admin') || [];
-    
-    if (availableUsers.length === 0) {
-      window.showToast('❌ No non-admin users available for ' + day, 'error');
-      return null;
-    }
-    
-    const randomIndex = Math.floor(Math.random() * availableUsers.length);
-    const selectedUserId = availableUsers[randomIndex].id;
-    
-    const response2 = await fetch(`${window.API_URL}/booking/select-random/${day}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ force_user_id: selectedUserId })
-    });
-
-    if (!response2.ok) {
-      const errorData = await response2.json();
-      throw new Error(errorData.error || 'Failed to select user');
+    const token = window.getToken();
+    if (!token) {
+        window.location.href = '/login.html';
+        return;
     }
 
-    const data2 = await response2.json();
-    window.showToast(`🎯 Random user selected for ${day}!`, 'success');
-    return data2;
-  } catch (error) {
-    console.error('Error selecting user:', error);
-    window.showToast(error.message || 'Failed to select user', 'error');
-    return null;
-  }
+    try {
+        const response = await fetch(`${window.API_URL}/booking/availability?week=next`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch availability');
+        const data = await response.json();
+        const booking = data.find(b => b.day === day);
+        
+        const availableUsers = booking?.available_users?.filter(u => u.email !== 'admin@gmail.com' && u.username !== 'admin') || [];
+        
+        if (availableUsers.length === 0) {
+            window.showToast('❌ No non-admin users available for ' + day, 'error');
+            return null;
+        }
+        
+        const randomIndex = Math.floor(Math.random() * availableUsers.length);
+        const selectedUserId = availableUsers[randomIndex].id;
+        
+        const response2 = await fetch(`${window.API_URL}/booking/select-random/${day}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ force_user_id: selectedUserId })
+        });
+
+        if (!response2.ok) {
+            const errorData = await response2.json();
+            throw new Error(errorData.error || 'Failed to select user');
+        }
+
+        const data2 = await response2.json();
+        window.showToast(`🎯 Random user selected for ${day}!`, 'success');
+        return data2;
+    } catch (error) {
+        console.error('Error selecting user:', error);
+        window.showToast(error.message || 'Failed to select user', 'error');
+        return null;
+    }
 }
 
-// ============ REPLACEMENT WITH NOTIFICATIONS ============
+// ===== REPLACEMENT WITH NOTIFICATIONS =====
 async function openReplacementModal(day) {
-  document.getElementById('replaceDay').textContent = day;
-  document.getElementById('replacementModal').style.display = 'flex';
-  const container = document.getElementById('replacementList');
-  container.innerHTML = 'Loading users...';
-  
-  try {
-    const allUsers = await getAllUsers();
-    const currentUser = window.getCurrentUser();
+    const replaceDayEl = document.getElementById('replaceDay');
+    if (replaceDayEl) replaceDayEl.textContent = day;
     
-    const availableUsers = allUsers.filter(function(user) {
-      return user.id !== currentUser?.id && 
-             user.email !== 'admin@gmail.com' && 
-             user.username !== 'admin';
-    });
+    const modal = document.getElementById('replacementModal');
+    if (modal) modal.style.display = 'flex';
     
-    if (availableUsers.length === 0) {
-      container.innerHTML = '<p style="color: #888;">No other non-admin users found.</p>';
-      return;
-    }
+    const container = document.getElementById('replacementList');
+    if (container) container.innerHTML = 'Loading users...';
     
-    let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
-    html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
-    html += '<option value="">-- Select a user --</option>';
-    
-    for (let i = 0; i < availableUsers.length; i++) {
-      const user = availableUsers[i];
-      const displayName = user.full_name || user.username;
-      html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
-    }
-    
-    html += '</select>';
-    html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
-    html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
-    
-    container.innerHTML = html;
-    
-    const confirmBtn = document.getElementById('confirmReplacementBtn');
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', async function() {
-        const select = document.getElementById('replacementSelect');
-        const selectedUserId = select?.value;
-        const selectedUsername = select?.options[select.selectedIndex]?.text || '';
-        const selectedFullName = select?.options[select.selectedIndex]?.text || selectedUsername;
+    try {
+        const allUsers = await getAllUsers();
+        const currentUser = window.getCurrentUser();
         
-        if (!selectedUserId) {
-          document.getElementById('replacementError').style.display = 'block';
-          return;
+        const availableUsers = allUsers.filter(function(user) {
+            return user.id !== currentUser?.id && 
+                   user.email !== 'admin@gmail.com' && 
+                   user.username !== 'admin';
+        });
+        
+        if (!container) return;
+        
+        if (availableUsers.length === 0) {
+            container.innerHTML = '<p style="color: #888;">No other non-admin users found.</p>';
+            return;
         }
         
-        document.getElementById('replacementError').style.display = 'none';
+        let html = '<p style="color:#666;margin-bottom:15px;">Select a replacement from all registered users (admin excluded):</p>';
+        html += '<select id="replacementSelect" class="replacement-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:15px;font-size:16px;">';
+        html += '<option value="">-- Select a user --</option>';
         
-        const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
-        if (confirmed) {
-          const success = await requestReplacement(currentUser.id, selectedUserId, day);
-          if (success) {
-            const today = new Date();
-            const dateStr = today.toISOString().split('T')[0];
-            
-            await recordHistory(
-                dateStr,
-                'replacement',
-                day,
-                'Requested replacement with ' + selectedUsername + ' for ' + day,
-                0,
-                selectedUsername
-            );
-            
-            window.showToast('✅ Replacement request sent to ' + selectedUsername + '!', 'success');
-            document.getElementById('replacementModal').style.display = 'none';
-            await renderDashboard();
-            await updateNotificationBadge();
-          } else {
-            window.showToast('❌ Failed to request replacement. Please try again.', 'error');
-          }
+        for (let i = 0; i < availableUsers.length; i++) {
+            const user = availableUsers[i];
+            const displayName = user.full_name || user.username;
+            html += '<option value="' + user.id + '">' + displayName + ' (@' + user.username + ')</option>';
         }
-      });
+        
+        html += '</select>';
+        html += '<button id="confirmReplacementBtn" class="btn btn-success" style="width:100%;">Confirm Replacement</button>';
+        html += '<div id="replacementError" style="color:red;display:none;margin-top:10px;">Please select a user.</div>';
+        
+        container.innerHTML = html;
+        
+        const confirmBtn = document.getElementById('confirmReplacementBtn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', async function() {
+                const select = document.getElementById('replacementSelect');
+                const selectedUserId = select?.value;
+                const selectedUsername = select?.options[select.selectedIndex]?.text || '';
+                
+                if (!selectedUserId) {
+                    const errorEl = document.getElementById('replacementError');
+                    if (errorEl) errorEl.style.display = 'block';
+                    return;
+                }
+                
+                const errorEl = document.getElementById('replacementError');
+                if (errorEl) errorEl.style.display = 'none';
+                
+                const confirmed = confirm('Are you sure you want ' + selectedUsername + ' to replace you for ' + day + '?');
+                if (confirmed) {
+                    const success = await requestReplacement(currentUser.id, selectedUserId, day);
+                    if (success) {
+                        const today = new Date();
+                        const dateStr = today.toISOString().split('T')[0];
+                        
+                        await recordHistory(
+                            dateStr,
+                            'replacement',
+                            day,
+                            'Requested replacement with ' + selectedUsername + ' for ' + day,
+                            0,
+                            selectedUsername
+                        );
+                        
+                        window.showToast('✅ Replacement request sent to ' + selectedUsername + '!', 'success');
+                        const modalEl = document.getElementById('replacementModal');
+                        if (modalEl) modalEl.style.display = 'none';
+                        await renderDashboard();
+                        await updateNotificationBadge();
+                    } else {
+                        window.showToast('❌ Failed to request replacement. Please try again.', 'error');
+                    }
+                }
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error loading users for replacement:', error);
+        if (container) container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
     }
-    
-  } catch (error) {
-    console.error('Error loading users for replacement:', error);
-    container.innerHTML = '<p style="color: red;">Failed to load users. Please try again.</p>';
-  }
 }
 
-// ============ OPT OUT WITH NOTIFICATIONS ============
+// ===== OPT OUT WITH NOTIFICATIONS =====
 async function handleOptOut(day, bookingId, action) {
     const user = window.getCurrentUser();
     if (!user) return;
@@ -1605,7 +1465,7 @@ async function handleOptOut(day, bookingId, action) {
     }
 }
 
-// ============ PENALTY PAY WITH NOTIFICATIONS ============
+// ===== PENALTY PAY WITH NOTIFICATIONS =====
 async function handlePenaltyPay(bookingId, day) {
     const user = window.getCurrentUser();
     if (!user) return;
@@ -1634,7 +1494,8 @@ async function handlePenaltyPay(bookingId, day) {
             
             await removeUserFromBooking(day, user.id);
             window.showToast('💰 Penalty paid. You have been removed from the booking.', 'success');
-            document.getElementById('penaltyModal').style.display = 'none';
+            const modal = document.getElementById('penaltyModal');
+            if (modal) modal.style.display = 'none';
             await renderDashboard();
             await loadNotifications();
             await updateNotificationBadge();
@@ -1644,201 +1505,17 @@ async function handlePenaltyPay(bookingId, day) {
     }
 }
 
-// ============ ADMIN ERASE FUNCTIONS ============
-async function loadPlayersForErase(selectId) {
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/all-users`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to fetch players');
-    
-    const players = await response.json();
-    const select = document.getElementById(selectId);
-    
-    if (!select) return;
-    
-    select.innerHTML = '<option value="">-- Select a player --</option>';
-    
-    for (let i = 0; i < players.length; i++) {
-      const player = players[i];
-      const name = player.full_name || player.username;
-      const adminTag = player.is_admin ? ' (Admin)' : '';
-      select.innerHTML += `<option value="${player.id}">${name} (@${player.username})${adminTag}</option>`;
+function openPenaltyModal(day, bookingId) {
+    const modal = document.getElementById('penaltyModal');
+    if (modal) modal.style.display = 'flex';
+    const payBtn = document.getElementById('penaltyPay');
+    if (payBtn) {
+        payBtn.dataset.bookingId = bookingId;
+        payBtn.dataset.day = day;
     }
-  } catch (error) {
-    console.error('Error loading players:', error);
-  }
 }
 
-async function erasePlayer() {
-  const select = document.getElementById('playerSelectErase');
-  const playerId = select?.value;
-  
-  if (!playerId) {
-    document.getElementById('erasePlayerError').textContent = 'Please select a player.';
-    document.getElementById('erasePlayerError').style.display = 'block';
-    return;
-  }
-  
-  const playerName = select.options[select.selectedIndex]?.text || 'this player';
-  
-  const confirmed = confirm(`⚠️ DANGER: This will COMPLETELY ERASE ${playerName} (account + all data). This cannot be undone! Are you sure?`);
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm(`⚠️ FINAL WARNING: Are you ABSOLUTELY sure you want to delete ${playerName} permanently?`);
-  if (!doubleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/erase-player`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: playerId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to erase player');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    document.getElementById('erasePlayerModal').style.display = 'none';
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error erasing player:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to erase player', 'error');
-  }
-}
-
-async function erasePlayerData() {
-  const select = document.getElementById('playerSelectEraseData');
-  const playerId = select?.value;
-  
-  if (!playerId) {
-    document.getElementById('erasePlayerDataError').textContent = 'Please select a player.';
-    document.getElementById('erasePlayerDataError').style.display = 'block';
-    return;
-  }
-  
-  const playerName = select.options[select.selectedIndex]?.text || 'this player';
-  
-  const confirmed = confirm(`⚠️ This will erase ALL data for ${playerName} (history, penalties, notifications, etc.) but KEEP their account. Continue?`);
-  if (!confirmed) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/erase-player-data`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: playerId })
-    });
-    
-    if (!response.ok) throw new Error('Failed to erase player data');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    document.getElementById('erasePlayerDataModal').style.display = 'none';
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error erasing player data:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to erase player data';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to erase player data', 'error');
-  }
-}
-
-async function wipeAllPlayerData() {
-  const confirmed = confirm('⚠️ This will erase ALL data for ALL players (history, penalties, notifications, etc.) but KEEP their accounts. Continue?');
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL player data will be permanently deleted. Accounts will be kept. Are you sure?');
-  if (!doubleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/wipe-all-data`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to wipe all data');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error wiping all data:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to wipe all data';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to wipe all data', 'error');
-  }
-}
-
-async function removeAllPlayers() {
-  const confirmed = confirm('⚠️⚠️⚠️ DANGER: This will REMOVE ALL PLAYERS (accounts + all data) EXCEPT your admin account. This cannot be undone! Are you sure?');
-  if (!confirmed) return;
-  
-  const doubleConfirm = confirm('⚠️ FINAL WARNING: ALL players will be permanently deleted. Only your admin account will remain. Are you ABSOLUTELY sure?');
-  if (!doubleConfirm) return;
-  
-  const tripleConfirm = confirm('⚠️ LAST CHANCE: Type "YES" to confirm.');
-  if (!tripleConfirm) return;
-  
-  const token = window.getToken();
-  if (!token) return;
-  
-  try {
-    const response = await fetch(`${window.API_URL}/admin/remove-all-players`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) throw new Error('Failed to remove all players');
-    
-    const data = await response.json();
-    document.getElementById('eraseStatus').textContent = `✅ ${data.message}`;
-    document.getElementById('eraseStatus').style.color = '#48bb78';
-    window.showToast(`✅ ${data.message}`, 'success');
-    await renderDashboard();
-  } catch (error) {
-    console.error('Error removing all players:', error);
-    document.getElementById('eraseStatus').textContent = '❌ Failed to remove all players';
-    document.getElementById('eraseStatus').style.color = '#f56565';
-    window.showToast('❌ Failed to remove all players', 'error');
-  }
-}
-
-// ============ ADMIN PANEL ============
+// ===== ADMIN PANEL =====
 async function openAdminPanel() {
     const modal = document.getElementById('adminModal');
     if (!modal) return;
@@ -1854,11 +1531,14 @@ async function openAdminPanel() {
 async function verifyAdmin() {
     const code = document.getElementById('adminCode').value;
     if (code === ADMIN_CODE) {
-        document.getElementById('adminError').style.display = 'none';
-        document.getElementById('adminContent').style.display = 'block';
+        const errorEl = document.getElementById('adminError');
+        if (errorEl) errorEl.style.display = 'none';
+        const contentEl = document.getElementById('adminContent');
+        if (contentEl) contentEl.style.display = 'block';
         await loadAllUsersAvailability();
     } else {
-        document.getElementById('adminError').style.display = 'block';
+        const errorEl = document.getElementById('adminError');
+        if (errorEl) errorEl.style.display = 'block';
     }
 }
 
@@ -1893,13 +1573,83 @@ async function loadAllUsersAvailability() {
     }
 }
 
-function openPenaltyModal(day, bookingId) {
-    document.getElementById('penaltyModal').style.display = 'flex';
-    document.getElementById('penaltyPay').dataset.bookingId = bookingId;
-    document.getElementById('penaltyPay').dataset.day = day;
+// ===== ADMIN: ANNOUNCE RESULTS =====
+async function announceResults() {
+    const token = window.getToken();
+    if (!token) return;
+    
+    const confirmed = confirm('📢 Announce results for next week? This will send notifications to all selected players.');
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/announce-results`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to announce results');
+        
+        const data = await response.json();
+        window.showToast(`📢 Results announced! ${data.notified} players notified.`, 'success');
+        await renderDashboard();
+        
+    } catch (error) {
+        console.error('Error announcing results:', error);
+        window.showToast('❌ Failed to announce results.', 'error');
+    }
 }
 
-// ============ INITIALIZATION ============
+// ===== ADMIN: VIEW ALL VOTES =====
+async function viewAllVotes() {
+    const token = window.getToken();
+    if (!token) return;
+    
+    try {
+        const response = await fetch(`${window.API_URL}/booking/all-votes`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch votes');
+        
+        const data = await response.json();
+        const container = document.getElementById('allUsersAvailability');
+        if (!container) return;
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="color: #888;">No votes recorded yet.</p>';
+            return;
+        }
+        
+        let html = '<h3>📊 All User Votes</h3>';
+        html += '<div class="votes-grid">';
+        
+        for (let i = 0; i < data.length; i++) {
+            const user = data[i];
+            const votes = user.availability || [];
+            const voteCount = votes.length;
+            
+            html += `<div class="vote-card">
+                <div class="vote-user">👤 ${user.username}</div>
+                <div class="vote-count">📅 ${voteCount} day${voteCount > 1 ? 's' : ''}</div>
+                <div class="vote-days">${votes.map(v => v.day).join(', ') || 'No votes'}</div>
+            </div>`;
+        }
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error viewing votes:', error);
+        window.showToast('❌ Failed to load votes.', 'error');
+    }
+}
+
+// ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', function() {
     if (window.location.pathname.includes('dashboard.html')) {
         const user = window.getCurrentUser();
@@ -1961,73 +1711,151 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // PANEL BUTTONS
-        document.getElementById('panelMyAvailability').addEventListener('click', function() {
-            switchView('dashboard');
-            const section = document.getElementById('myAvailability');
-            if (section) section.scrollIntoView({ behavior: 'smooth' });
-        });
-        document.getElementById('panelRules').addEventListener('click', function() {
-            switchView('rules');
-        });
-        document.getElementById('panelNotifications').addEventListener('click', function() {
-            switchView('notifications');
-        });
+        const panelMyAvailability = document.getElementById('panelMyAvailability');
+        if (panelMyAvailability) {
+            panelMyAvailability.addEventListener('click', function() {
+                switchView('dashboard');
+                const section = document.getElementById('myAvailability');
+                if (section) section.scrollIntoView({ behavior: 'smooth' });
+            });
+        }
+        
+        const panelRules = document.getElementById('panelRules');
+        if (panelRules) {
+            panelRules.addEventListener('click', function() {
+                switchView('rules');
+            });
+        }
+        
+        const panelNotifications = document.getElementById('panelNotifications');
+        if (panelNotifications) {
+            panelNotifications.addEventListener('click', function() {
+                switchView('notifications');
+            });
+        }
+        
+        const panelHistory = document.getElementById('panelHistory');
+        if (panelHistory) {
+            panelHistory.addEventListener('click', function() {
+                switchView('notifications');
+            });
+        }
+        
         const panelAdmin = document.getElementById('panelAdmin');
         if (panelAdmin) {
             panelAdmin.addEventListener('click', openAdminPanel);
         }
-        document.getElementById('panelLogout').addEventListener('click', function() {
-            window.logoutUser();
-        });
+        
+        const panelLogout = document.getElementById('panelLogout');
+        if (panelLogout) {
+            panelLogout.addEventListener('click', function() {
+                window.logoutUser();
+            });
+        }
         
         // ADMIN MODAL
-        document.getElementById('closeAdminModal').addEventListener('click', function() {
-            document.getElementById('adminModal').style.display = 'none';
-        });
+        const closeAdminModal = document.getElementById('closeAdminModal');
+        if (closeAdminModal) {
+            closeAdminModal.addEventListener('click', function() {
+                const modal = document.getElementById('adminModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
         window.addEventListener('click', function(e) {
             const modal = document.getElementById('adminModal');
-            if (e.target === modal) modal.style.display = 'none';
+            if (e.target === modal) {
+                if (modal) modal.style.display = 'none';
+            }
         });
-        document.getElementById('verifyAdminBtn').addEventListener('click', verifyAdmin);
-        document.getElementById('adminCode').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') verifyAdmin();
-        });
+        
+        const verifyAdminBtn = document.getElementById('verifyAdminBtn');
+        if (verifyAdminBtn) {
+            verifyAdminBtn.addEventListener('click', verifyAdmin);
+        }
+        
+        const adminCodeInput = document.getElementById('adminCode');
+        if (adminCodeInput) {
+            adminCodeInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') verifyAdmin();
+            });
+        }
         
         // OPT OUT MODAL
-        document.getElementById('closeOptOutModal').addEventListener('click', closeOptOutModal);
-        document.getElementById('optOutCancel').addEventListener('click', function() {
-            handleOptOut(optOutDay, selectedBookingId, 'cancel');
-        });
-        document.getElementById('optOutNotBooked').addEventListener('click', function() {
-            handleOptOut(optOutDay, selectedBookingId, 'notBooked');
-        });
-        document.getElementById('optOutReplace').addEventListener('click', function() {
-            handleOptOut(optOutDay, selectedBookingId, 'replace');
-        });
-        document.getElementById('optOutPenalty').addEventListener('click', function() {
-            handleOptOut(optOutDay, selectedBookingId, 'penalty');
-        });
+        const closeOptOutModalBtn = document.getElementById('closeOptOutModal');
+        if (closeOptOutModalBtn) {
+            closeOptOutModalBtn.addEventListener('click', closeOptOutModal);
+        }
+        
+        const optOutCancel = document.getElementById('optOutCancel');
+        if (optOutCancel) {
+            optOutCancel.addEventListener('click', function() {
+                handleOptOut(optOutDay, selectedBookingId, 'cancel');
+            });
+        }
+        
+        const optOutNotBooked = document.getElementById('optOutNotBooked');
+        if (optOutNotBooked) {
+            optOutNotBooked.addEventListener('click', function() {
+                handleOptOut(optOutDay, selectedBookingId, 'notBooked');
+            });
+        }
+        
+        const optOutReplace = document.getElementById('optOutReplace');
+        if (optOutReplace) {
+            optOutReplace.addEventListener('click', function() {
+                handleOptOut(optOutDay, selectedBookingId, 'replace');
+            });
+        }
+        
+        const optOutPenalty = document.getElementById('optOutPenalty');
+        if (optOutPenalty) {
+            optOutPenalty.addEventListener('click', function() {
+                handleOptOut(optOutDay, selectedBookingId, 'penalty');
+            });
+        }
         
         // REPLACEMENT MODAL
-        document.getElementById('closeReplacementModal').addEventListener('click', function() {
-            document.getElementById('replacementModal').style.display = 'none';
-        });
-        document.getElementById('replacementCancel').addEventListener('click', function() {
-            document.getElementById('replacementModal').style.display = 'none';
-        });
+        const closeReplacementModal = document.getElementById('closeReplacementModal');
+        if (closeReplacementModal) {
+            closeReplacementModal.addEventListener('click', function() {
+                const modal = document.getElementById('replacementModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+        
+        const replacementCancel = document.getElementById('replacementCancel');
+        if (replacementCancel) {
+            replacementCancel.addEventListener('click', function() {
+                const modal = document.getElementById('replacementModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
         
         // PENALTY MODAL
-        document.getElementById('closePenaltyModal').addEventListener('click', function() {
-            document.getElementById('penaltyModal').style.display = 'none';
-        });
-        document.getElementById('penaltyCancel').addEventListener('click', function() {
-            document.getElementById('penaltyModal').style.display = 'none';
-        });
-        document.getElementById('penaltyPay').addEventListener('click', function() {
-            const bookingId = this.dataset.bookingId;
-            const day = this.dataset.day;
-            handlePenaltyPay(bookingId, day);
-        });
+        const closePenaltyModal = document.getElementById('closePenaltyModal');
+        if (closePenaltyModal) {
+            closePenaltyModal.addEventListener('click', function() {
+                const modal = document.getElementById('penaltyModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+        
+        const penaltyCancel = document.getElementById('penaltyCancel');
+        if (penaltyCancel) {
+            penaltyCancel.addEventListener('click', function() {
+                const modal = document.getElementById('penaltyModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+        
+        const penaltyPay = document.getElementById('penaltyPay');
+        if (penaltyPay) {
+            penaltyPay.addEventListener('click', function() {
+                const bookingId = this.dataset.bookingId;
+                const day = this.dataset.day;
+                handlePenaltyPay(bookingId, day);
+            });
+        }
         
         // CLICK OUTSIDE MODALS
         window.addEventListener('click', function(e) {
@@ -2035,13 +1863,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const replacementModal = document.getElementById('replacementModal');
             const penaltyModal = document.getElementById('penaltyModal');
             if (e.target === optOutModal) closeOptOutModal();
-            if (e.target === replacementModal) document.getElementById('replacementModal').style.display = 'none';
-            if (e.target === penaltyModal) document.getElementById('penaltyModal').style.display = 'none';
+            if (e.target === replacementModal) {
+                if (replacementModal) replacementModal.style.display = 'none';
+            }
+            if (e.target === penaltyModal) {
+                if (penaltyModal) penaltyModal.style.display = 'none';
+            }
         });
         
-        document.getElementById('logoutBtn').addEventListener('click', function() {
-            window.logoutUser();
-        });
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function() {
+                window.logoutUser();
+            });
+        }
         
         // TEST RUN BUTTONS
         const testRunBtn = document.getElementById('testRunBtn');
@@ -2058,63 +1893,51 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // ERASE BUTTONS
-        const erasePlayerBtn = document.getElementById('erasePlayerBtn');
-        if (erasePlayerBtn) {
-            erasePlayerBtn.addEventListener('click', async function() {
-                await loadPlayersForErase('playerSelectErase');
-                document.getElementById('erasePlayerModal').style.display = 'flex';
+        // Admin panel buttons
+        const viewVotesBtn = document.getElementById('viewVotesBtn');
+        if (viewVotesBtn) {
+            viewVotesBtn.addEventListener('click', viewAllVotes);
+        }
+        
+        const announceResultsBtn = document.getElementById('announceResultsBtn');
+        if (announceResultsBtn) {
+            announceResultsBtn.addEventListener('click', announceResults);
+        }
+        
+        const randomSelectAllBtn = document.getElementById('randomSelectAllBtn');
+        if (randomSelectAllBtn) {
+            randomSelectAllBtn.addEventListener('click', async function() {
+                const confirmed = confirm('🎲 Randomly select players for ALL days?');
+                if (!confirmed) return;
+                
+                const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                for (let i = 0; i < dayOrder.length; i++) {
+                    await selectRandomUser(dayOrder[i]);
+                }
+                await renderDashboard();
+                window.showToast('🎯 Random selection complete for all days!', 'success');
             });
         }
         
-        const erasePlayerDataBtn = document.getElementById('erasePlayerDataBtn');
-        if (erasePlayerDataBtn) {
-            erasePlayerDataBtn.addEventListener('click', async function() {
-                await loadPlayersForErase('playerSelectEraseData');
-                document.getElementById('erasePlayerDataModal').style.display = 'flex';
+        const resetAllBtn = document.getElementById('resetAllBtn');
+        if (resetAllBtn) {
+            resetAllBtn.addEventListener('click', async function() {
+                const confirmed = confirm('🔄 Reset ALL days? This will clear all selections.');
+                if (!confirmed) return;
+                
+                const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                for (let i = 0; i < dayOrder.length; i++) {
+                    const response = await fetch(`${window.API_URL}/booking/reset/${dayOrder[i]}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${window.getToken()}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                }
+                await renderDashboard();
+                window.showToast('🔄 All days reset successfully!', 'success');
             });
         }
-        
-        const wipeAllDataBtn = document.getElementById('wipeAllDataBtn');
-        if (wipeAllDataBtn) {
-            wipeAllDataBtn.addEventListener('click', wipeAllPlayerData);
-        }
-        
-        const removeAllPlayersBtn = document.getElementById('removeAllPlayersBtn');
-        if (removeAllPlayersBtn) {
-            removeAllPlayersBtn.addEventListener('click', removeAllPlayers);
-        }
-        
-        // Close modals
-        const closeErasePlayerModal = document.getElementById('closeErasePlayerModal');
-        if (closeErasePlayerModal) {
-            closeErasePlayerModal.addEventListener('click', function() {
-                document.getElementById('erasePlayerModal').style.display = 'none';
-            });
-        }
-        
-        const closeErasePlayerDataModal = document.getElementById('closeErasePlayerDataModal');
-        if (closeErasePlayerDataModal) {
-            closeErasePlayerDataModal.addEventListener('click', function() {
-                document.getElementById('erasePlayerDataModal').style.display = 'none';
-            });
-        }
-        
-        const confirmErasePlayerBtn = document.getElementById('confirmErasePlayerBtn');
-        if (confirmErasePlayerBtn) {
-            confirmErasePlayerBtn.addEventListener('click', erasePlayer);
-        }
-        
-        const confirmErasePlayerDataBtn = document.getElementById('confirmErasePlayerDataBtn');
-        if (confirmErasePlayerDataBtn) {
-            confirmErasePlayerDataBtn.addEventListener('click', erasePlayerData);
-        }
-        
-        window.addEventListener('click', function(e) {
-            const modal1 = document.getElementById('erasePlayerModal');
-            const modal2 = document.getElementById('erasePlayerDataModal');
-            if (e.target === modal1) modal1.style.display = 'none';
-            if (e.target === modal2) modal2.style.display = 'none';
-        });
     }
 });
