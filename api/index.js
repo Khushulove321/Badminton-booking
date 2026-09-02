@@ -1835,3 +1835,258 @@ function getNextWeekDates() {
   }
   return weekDates;
 }
+
+// ===== BOOKING SCHEDULE FUNCTIONS =====
+
+// Get the weekly booking schedule (This Week & Next Week)
+app.get('/api/booking/schedule', authenticate, async (req, res) => {
+  try {
+    const thisWeekDates = getThisWeekDates();
+    const nextWeekDates = getNextWeekDates();
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    // Get all bookings with selected users
+    const { data: bookings, error } = await supabaseAdmin
+      .from('bookings')
+      .select(`
+        day,
+        is_booked,
+        selected_user_id,
+        profiles:selected_user_id (
+          id,
+          username,
+          full_name
+        ),
+        availability (
+          user_id,
+          profiles:user_id (
+            id,
+            username,
+            full_name
+          )
+        )
+      `);
+      
+    if (error) throw error;
+    
+    // Get all replacement history
+    const { data: replacements, error: replaceError } = await supabaseAdmin
+      .from('replacements')
+      .select('*')
+      .eq('status', 'accepted');
+      
+    if (replaceError) throw replaceError;
+    
+    // Format the schedule
+    const schedule = [];
+    
+    for (let day of dayOrder) {
+      const booking = bookings.find(b => b.day === day);
+      const thisWeekDate = thisWeekDates.find(d => d.day === day);
+      const nextWeekDate = nextWeekDates.find(d => d.day === day);
+      
+      // Get available users for this day
+      const availableUsers = booking?.availability?.map(a => ({
+        id: a.profiles.id,
+        username: a.profiles.username,
+        full_name: a.profiles.full_name
+      })) || [];
+      
+      // Get replacements for this day
+      const dayReplacements = replacements.filter(r => r.day === day);
+      
+      schedule.push({
+        day: day,
+        thisWeek: {
+          date: thisWeekDate?.date || null,
+          dateString: thisWeekDate?.dateString || null,
+          selected_user: booking?.profiles || null,
+          is_booked: booking?.is_booked || false,
+          available_count: availableUsers.length,
+          available_users: availableUsers,
+          replacements: dayReplacements
+        },
+        nextWeek: {
+          date: nextWeekDate?.date || null,
+          dateString: nextWeekDate?.dateString || null,
+          selected_user: null, // Will be set by random selection on Sunday
+          is_booked: false,
+          available_count: 0,
+          available_users: []
+        }
+      });
+    }
+    
+    res.json(schedule);
+  } catch (error) {
+    console.error('Error fetching schedule:', error);
+    res.status(500).json({ error: 'Error fetching schedule' });
+  }
+});
+
+// Get available users for a specific day
+app.get('/api/booking/day-availability/:day', authenticate, async (req, res) => {
+  try {
+    const { day } = req.params;
+    
+    const { data: booking, error } = await supabaseAdmin
+      .from('bookings')
+      .select(`
+        day,
+        availability (
+          user_id,
+          profiles:user_id (
+            id,
+            username,
+            full_name
+          )
+        )
+      `)
+      .eq('day', day)
+      .single();
+      
+    if (error) throw error;
+    
+    const availableUsers = booking?.availability?.map(a => ({
+      id: a.profiles.id,
+      username: a.profiles.username,
+      full_name: a.profiles.full_name
+    })) || [];
+    
+    res.json({ day, available_users: availableUsers });
+  } catch (error) {
+    console.error('Error fetching day availability:', error);
+    res.status(500).json({ error: 'Error fetching day availability' });
+  }
+});
+
+// Run Sunday selection (automatically picks bookers for next week)
+app.post('/api/booking/run-sunday-selection', authenticate, isAdmin, async (req, res) => {
+  try {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const results = [];
+    
+    for (let day of dayOrder) {
+      // Get all users who marked "In" for this day
+      const { data: booking, error } = await supabaseAdmin
+        .from('bookings')
+        .select(`
+          id,
+          day,
+          availability (
+            user_id
+          )
+        `)
+        .eq('day', day)
+        .single();
+        
+      if (error) throw error;
+      
+      const availableUsers = booking?.availability?.map(a => a.user_id) || [];
+      
+      if (availableUsers.length === 0) {
+        results.push({ day, selected: null, message: 'No users available' });
+        continue;
+      }
+      
+      // Randomly select one user
+      const randomIndex = Math.floor(Math.random() * availableUsers.length);
+      const selectedUserId = availableUsers[randomIndex];
+      
+      // Update booking with selected user
+      const { error: updateError } = await supabaseAdmin
+        .from('bookings')
+        .update({ 
+          selected_user_id: selectedUserId,
+          is_booked: true,
+          updated_at: new Date()
+        })
+        .eq('day', day);
+        
+      if (updateError) throw updateError;
+      
+      // Get user details
+      const { data: user, error: userError } = await supabaseAdmin
+        .from('profiles')
+        .select('username, full_name')
+        .eq('id', selectedUserId)
+        .single();
+        
+      if (userError) throw userError;
+      
+      // Create notification for selected user
+      await supabaseAdmin
+        .from('notifications')
+        .insert({
+          user_id: selectedUserId,
+          title: '🎯 You\'ve Been Selected to Book!',
+          message: `You have been randomly selected to book the court for ${day}. Please confirm if you can do it.`,
+          type: 'info',
+          related_id: booking.id
+        });
+      
+      results.push({ 
+        day, 
+        selected: user, 
+        message: 'User selected successfully' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Sunday selection completed',
+      results: results
+    });
+  } catch (error) {
+    console.error('Error running Sunday selection:', error);
+    res.status(500).json({ error: 'Error running Sunday selection' });
+  }
+});
+
+// Helper functions for dates
+function getThisWeekDates() {
+  const today = new Date();
+  const currentDay = today.getDay();
+  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - daysToMonday);
+  const weekDates = [];
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(thisMonday);
+    date.setDate(thisMonday.getDate() + i);
+    weekDates.push({
+      day: dayNames[i],
+      date: date,
+      dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    });
+  }
+  return weekDates;
+}
+
+function getNextWeekDates() {
+  const today = new Date();
+  const currentDay = today.getDay();
+  let daysUntilNextMonday;
+  if (currentDay === 0) {
+    daysUntilNextMonday = 1;
+  } else if (currentDay === 1) {
+    daysUntilNextMonday = 7;
+  } else {
+    daysUntilNextMonday = 8 - currentDay;
+  }
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+  const weekDates = [];
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(nextMonday);
+    date.setDate(nextMonday.getDate() + i);
+    weekDates.push({
+      day: dayNames[i],
+      date: date,
+      dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    });
+  }
+  return weekDates;
+}
