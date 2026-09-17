@@ -79,26 +79,23 @@
 
                     <!-- BOOKING SCHEDULE TABLE -->
                     <div class="selected-players-section">
-                        <h3>📅 Weekly Booking Schedule</h3>
-                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
-                            Who is responsible for booking the court each day.
-                            <br><span style="font-size:0.85rem;color:#888;">Updated every Sunday night.</span>
-                        </p>
-                        <div id="scheduleTable" class="selected-players-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Day</th>
-                                        <th>This Week</th>
-                                        <th>Next Week</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="scheduleBody">
-                                    <tr><td colspan="3" style="text-align:center;color:#888;padding:30px;">📅 Loading schedule...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <h3>🏆 Weekly Booking Schedule</h3>
+                <p style="color:#666;margin-bottom:15px;">Who is responsible for booking the court each day. Updated every Sunday night.</p>
+                <div class="selected-players-table">
+                    <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                        <thead>
+                            <tr>
+                                <th style="background:#667eea;color:white;padding:12px 20px;text-align:left;font-weight:600;">Day</th>
+                                <th style="background:#667eea;color:white;padding:12px 20px;text-align:left;font-weight:600;">This Week</th>
+                                <th style="background:#667eea;color:white;padding:12px 20px;text-align:left;font-weight:600;">Next Week</th>
+                            </tr>
+                        </thead>
+                        <tbody id="selectedPlayersBody">
+                            <tr><td colspan="3" style="text-align:center;padding:20px;color:#888;">Loading schedule...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
                     <div class="info-section">
                         <div class="info-card">
