@@ -1763,6 +1763,48 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
+        var adminTestRunBtn = document.getElementById('adminTestRunBtn');
+        if (adminTestRunBtn) {
+            adminTestRunBtn.addEventListener('click', function() {
+                window.adminTestRun();
+            });
+        }
+        
+        var adminSimulateSundayBtn = document.getElementById('adminSimulateSundayBtn');
+        if (adminSimulateSundayBtn) {
+            adminSimulateSundayBtn.addEventListener('click', function() {
+                window.adminSimulateSunday();
+            });
+        }
+        
+        var adminErasePlayerBtn = document.getElementById('adminErasePlayerBtn');
+        if (adminErasePlayerBtn) {
+            adminErasePlayerBtn.addEventListener('click', function() {
+                window.adminErasePlayer();
+            });
+        }
+        
+        var adminErasePlayerDataBtn = document.getElementById('adminErasePlayerDataBtn');
+        if (adminErasePlayerDataBtn) {
+            adminErasePlayerDataBtn.addEventListener('click', function() {
+                window.adminErasePlayerData();
+            });
+        }
+        
+        var adminWipeAllBtn = document.getElementById('adminWipeAllBtn');
+        if (adminWipeAllBtn) {
+            adminWipeAllBtn.addEventListener('click', function() {
+                window.adminWipeAllPlayerData();
+            });
+        }
+        
+        var adminRemoveAllBtn = document.getElementById('adminRemoveAllBtn');
+        if (adminRemoveAllBtn) {
+            adminRemoveAllBtn.addEventListener('click', function() {
+                window.adminRemoveAllPlayers();
+            });
+        }
+        
         var testRunBtn = document.getElementById('testRunBtn');
         if (testRunBtn) {
             testRunBtn.addEventListener('click', function() {
@@ -1822,3 +1864,122 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+
+// ===== ADMIN DATA MANAGEMENT HANDLERS =====
+async function adminErasePlayer() {
+    var day = prompt('Which day? (Monday, Tuesday, ... Sunday)');
+    if (!day) return;
+    var users = await getAvailableUsersForDay(day);
+    if (!users || users.length === 0) {
+        window.showToast('No players on ' + day, 'info');
+        return;
+    }
+    var listStr = users.map(function(u, i) { return (i+1) + '. ' + u.username + ' (' + u.id + ')'; }).join('\n');
+    var pick = prompt('Which player to erase?\n' + listStr + '\n\nEnter number:');
+    if (!pick) return;
+    var idx = parseInt(pick) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= users.length) {
+        window.showToast('Invalid choice', 'error');
+        return;
+    }
+    var targetId = users[idx].id;
+    var targetName = users[idx].username;
+    if (!confirm('Erase ' + targetName + ' from ' + day + '?')) return;
+    var token = window.getToken();
+    try {
+        var res = await fetch(window.API_URL + '/booking/select/' + day, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: targetId, action: 'remove' })
+        });
+        if (!res.ok) throw new Error('Failed');
+        window.showToast('✅ ' + targetName + ' erased from ' + day, 'success');
+        await renderDashboard();
+    } catch (e) {
+        console.error(e);
+        window.showToast('❌ Failed to erase player', 'error');
+    }
+}
+
+async function adminErasePlayerData() {
+    var day = prompt('Erase ALL players from which day? (Monday, Tuesday, ... Sunday)');
+    if (!day) return;
+    if (!confirm('⚠️ Erase ALL players from ' + day + '? This cannot be undone.')) return;
+    var token = window.getToken();
+    try {
+        var av = await getAvailability('next');
+        var booking = av.find(function(b) { return b.day === day; });
+        var users = booking && booking.available_users ? booking.available_users : [];
+        if (users.length === 0) {
+            window.showToast('No players to erase on ' + day, 'info');
+            return;
+        }
+        for (var i = 0; i < users.length; i++) {
+            await fetch(window.API_URL + '/booking/select/' + day, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: users[i].id, action: 'remove' })
+            });
+        }
+        window.showToast('✅ Erased ' + users.length + ' players from ' + day, 'success');
+        await renderDashboard();
+    } catch (e) {
+        console.error(e);
+        window.showToast('❌ Failed to erase day data', 'error');
+    }
+}
+
+async function adminWipeAllPlayerData() {
+    if (!confirm('⚠️ WIPE ALL player selections for the entire week? This cannot be undone.')) return;
+    var token = window.getToken();
+    var dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    var totalRemoved = 0;
+    try {
+        var av = await getAvailability('next');
+        for (var d = 0; d < dayOrder.length; d++) {
+            var day = dayOrder[d];
+            var booking = av.find(function(b) { return b.day === day; });
+            var users = booking && booking.available_users ? booking.available_users : [];
+            for (var i = 0; i < users.length; i++) {
+                await fetch(window.API_URL + '/booking/select/' + day, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: users[i].id, action: 'remove' })
+                });
+                totalRemoved++;
+            }
+        }
+        window.showToast('✅ Wiped ' + totalRemoved + ' player selections', 'success');
+        await renderDashboard();
+    } catch (e) {
+        console.error(e);
+        window.showToast('❌ Failed to wipe data', 'error');
+    }
+}
+
+async function adminRemoveAllPlayers() {
+    await adminWipeAllPlayerData();
+    window.showToast('🚫 All players removed', 'success');
+}
+
+async function adminTestRun() {
+    if (typeof toggleTestRun === 'function') {
+        toggleTestRun();
+    } else {
+        window.showToast('🧪 Test Run — reload page', 'info');
+    }
+}
+
+async function adminSimulateSunday() {
+    if (typeof simulateSunday === 'function') {
+        simulateSunday();
+    }
+}
+
+window.adminErasePlayer = adminErasePlayer;
+window.adminErasePlayerData = adminErasePlayerData;
+window.adminWipeAllPlayerData = adminWipeAllPlayerData;
+window.adminRemoveAllPlayers = adminRemoveAllPlayers;
+window.adminTestRun = adminTestRun;
+window.adminSimulateSunday = adminSimulateSunday;
