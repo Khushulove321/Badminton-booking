@@ -812,12 +812,14 @@ function renderPlayerDropdown(availableUsers, day) {
 
 // ===== RENDER DAY CARD WITH DROPDOWN =====
 function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
-    var card = document.createElement('div');
+    const card = document.createElement('div');
     card.className = 'day-card';
     
-    var isUserAvailable = false;
-    if (dayData.available_users) {
-        for (var i = 0; i < dayData.available_users.length; i++) {
+    const isCurrentUserAdmin = isAdmin;
+    
+    let isUserAvailable = false;
+    if (dayData.available_users && !isCurrentUserAdmin) {
+        for (let i = 0; i < dayData.available_users.length; i++) {
             if (dayData.available_users[i].id === currentUser?.id) {
                 isUserAvailable = true;
                 break;
@@ -828,36 +830,86 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
     if (isUserAvailable) card.classList.add('selected');
     if (isBooked) card.classList.add('booked');
     
-    var displayName = dayData.date ? dayData.day + ' - ' + dayData.date : dayData.day;
-    var availableCount = dayData.available_users ? dayData.available_users.length : 0;
+    const displayName = dayData.date ? dayData.day + ' - ' + dayData.date : dayData.day;
+    const availableCount = dayData.available_users ? dayData.available_users.length : 0;
     
-    var selectedUserHtml = '';
+    let selectedUserHtml = '';
     if (isBooked && dayData.selected_user) {
         selectedUserHtml = '<div class="selected-user">🎯 Booker: <strong>' + dayData.selected_user.username + '</strong></div>';
     }
     
-    var buttonText = isUserAvailable ? '✅ In' : '📝 In for this day';
-    var buttonClass = isUserAvailable ? 'in-btn in' : 'in-btn';
-    var disabledAttr = !canEditBool ? 'disabled' : '';
+    const dropdownHtml = renderPlayerDropdown(dayData.available_users, dayData.day);
     
-    var dropdownHtml = renderPlayerDropdown(dayData.available_users, dayData.day);
+    // VOTING BUTTON — only for regular users
+    let voteButton = '';
+    if (!isCurrentUserAdmin) {
+        const buttonText = isUserAvailable ? '✅ In' : '📝 In for this day';
+        const buttonClass = isUserAvailable ? 'in-btn in' : 'in-btn';
+        const disabledAttr = !canEditBool ? 'disabled' : '';
+        voteButton = '<button class="' + buttonClass + ' btn btn-sm" data-day="' + dayData.day + '" data-date="' + (dayData.date || '') + '" ' + disabledAttr + '>' +
+            buttonText +
+            '</button>';
+    } else {
+        // Admin sees a read-only badge instead
+        voteButton = '<div style="margin-top:8px;padding:8px;background:#f7fafc;border:1px dashed #cbd5e0;border-radius:5px;font-size:0.8rem;color:#666;text-align:center;">' +
+            '👑 Admin view only' +
+            '</div>';
+    }
+    
+    // Admin quick actions per day
+    let adminActions = '';
+    if (isCurrentUserAdmin) {
+        adminActions = '<div style="margin-top:8px;display:flex;gap:5px;justify-content:center;">' +
+            '<button class="btn btn-warning btn-sm quick-random" data-day="' + dayData.day + '" style="padding:6px 10px;font-size:0.8rem;">🎲 Pick Random</button>' +
+            '<button class="btn btn-danger btn-sm quick-reset" data-day="' + dayData.day + '" style="padding:6px 10px;font-size:0.8rem;">🔄 Reset</button>' +
+            '</div>';
+    }
     
     card.innerHTML = '<div class="day-name">' + displayName + '</div>' +
         '<div class="day-status">' + (isBooked ? '📌 Booked' : '✅ Available') + '</div>' +
-        '<div class="user-count">👥 ' + availableCount + ' player' + (availableCount > 1 ? 's' : '') + ' in</div>' +
+        '<div class="user-count">👥 ' + availableCount + ' player' + (availableCount !== 1 ? 's' : '') + ' in</div>' +
         selectedUserHtml +
         '<div style="margin-top:8px;">' + dropdownHtml + '</div>' +
-        '<button class="' + buttonClass + ' btn btn-sm" data-day="' + dayData.day + '" data-date="' + (dayData.date || '') + '" ' + disabledAttr + '>' +
-        buttonText +
-        '</button>';
+        voteButton +
+        adminActions;
     
-    if (canEditBool) {
-        var btn = card.querySelector('.in-btn');
-        btn.addEventListener('click', function(e) {
+    // Only wire up voting button for non-admin
+    if (canEditBool && !isCurrentUserAdmin) {
+        const btn = card.querySelector('.in-btn');
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                handleToggleAvailability(this.dataset.day, this.dataset.date);
+            });
+        }
+    }
+    
+    // Admin quick buttons
+    const randomBtn = card.querySelector('.quick-random');
+    if (randomBtn) {
+        randomBtn.addEventListener('click', async function(e) {
             e.stopPropagation();
-            var day = this.dataset.day;
-            var date = this.dataset.date;
-            handleToggleAvailability(day, date);
+            this.disabled = true;
+            this.textContent = '⏳...';
+            await selectRandomUser(dayData.day);
+            await renderDashboard();
+        });
+    }
+    
+    const resetBtn = card.querySelector('.quick-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', async function(e) {
+            e.stopPropagation();
+            if (!confirm('Reset booker for ' + dayData.day + '?')) return;
+            this.disabled = true;
+            this.textContent = '⏳...';
+            const token = window.getToken();
+            await fetch(window.API_URL + '/booking/reset/' + dayData.day, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+            });
+            window.showToast('🔄 Reset ' + dayData.day, 'success');
+            await renderDashboard();
         });
     }
     
