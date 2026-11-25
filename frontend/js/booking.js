@@ -840,7 +840,7 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
     
     const dropdownHtml = renderPlayerDropdown(dayData.available_users, dayData.day);
     
-    // VOTING BUTTON — only for regular users
+    // ONLY toggle button for regular users (NO OPT OUT HERE)
     let voteButton = '';
     if (!isCurrentUserAdmin) {
         const buttonText = isUserAvailable ? '✅ In' : '📝 In for this day';
@@ -850,7 +850,7 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
             buttonText +
             '</button>';
     } else {
-        // Admin sees a read-only badge instead
+        // Admin sees a read-only badge
         voteButton = '<div style="margin-top:8px;padding:8px;background:#f7fafc;border:1px dashed #cbd5e0;border-radius:5px;font-size:0.8rem;color:#666;text-align:center;">' +
             '👑 Admin view only' +
             '</div>';
@@ -865,9 +865,17 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
             '</div>';
     }
     
+    // Hide "0 players in" text to reduce noise
+    let countHtml = '';
+    if (availableCount > 0) {
+        countHtml = '<div class="user-count">👥 ' + availableCount + ' player' + (availableCount !== 1 ? 's' : '') + ' in</div>';
+    } else {
+        countHtml = '<div class="user-count" style="min-height:19px;"></div>';
+    }
+    
     card.innerHTML = '<div class="day-name">' + displayName + '</div>' +
-        '<div class="day-status">' + (isBooked ? '📌 Booked' : '✅ Available') + '</div>' +
-        '<div class="user-count">👥 ' + availableCount + ' player' + (availableCount !== 1 ? 's' : '') + ' in</div>' +
+        '<div class="day-status">' + (isBooked ? '📌 Booked' : '🟢 Open') + '</div>' +
+        countHtml +
         selectedUserHtml +
         '<div style="margin-top:8px;">' + dropdownHtml + '</div>' +
         voteButton +
@@ -916,6 +924,7 @@ function renderDayCard(dayData, canEditBool, isBooked, currentUser) {
     return card;
 }
 
+
 function renderMyAvailability(myAvailability, isBookedDays) {
     var container = document.getElementById('myDaysList');
     if (!container) return;
@@ -936,6 +945,8 @@ function renderMyAvailability(myAvailability, isBookedDays) {
     }
     html += '</div>';
     container.innerHTML = html;
+    
+    // Wire up Opt Out buttons ONLY here
     var btns = container.querySelectorAll('.opt-out-btn');
     for (var i = 0; i < btns.length; i++) {
         btns[i].addEventListener('click', function(e) {
@@ -946,6 +957,7 @@ function renderMyAvailability(myAvailability, isBookedDays) {
         });
     }
 }
+
 
 // ===== TWO WEEK TABLE =====
 async function renderTwoWeekTable(isAdminUser) {
